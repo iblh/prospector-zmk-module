@@ -1,3 +1,6 @@
+#if defined(CONFIG_PROSPECTOR_TOUCH_UI)
+#include <prospector/touch_settings.h>
+#endif
 #include <lvgl.h>
 
 #include "layer_indicator.h"
@@ -37,5 +40,8 @@ lv_obj_t *zmk_display_status_screen() {
     zmk_widget_battery_circles_init(&battery_circles_widget, screen);
     lv_obj_set_pos(zmk_widget_battery_circles_obj(&battery_circles_widget), 172, 178);
 
+#if defined(CONFIG_PROSPECTOR_TOUCH_UI)
+    prospector_touch_settings_attach(screen);
+#endif
     return screen;
 }

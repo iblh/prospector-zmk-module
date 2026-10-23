@@ -1,3 +1,6 @@
+#if defined(CONFIG_PROSPECTOR_TOUCH_UI)
+#include <prospector/touch_settings.h>
+#endif
 #include <lvgl.h>
 
 #include "layer_roller.h"
@@ -31,5 +34,8 @@ lv_obj_t *zmk_display_status_screen() {
     lv_obj_set_size(zmk_widget_layer_roller_obj(&layer_roller_widget), 224, 140);
     lv_obj_align(zmk_widget_layer_roller_obj(&layer_roller_widget), LV_ALIGN_LEFT_MID, 0, -20);
 
+#if defined(CONFIG_PROSPECTOR_TOUCH_UI)
+    prospector_touch_settings_attach(screen);
+#endif
     return screen;
 }

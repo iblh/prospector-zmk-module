@@ -90,3 +90,10 @@ config PROSPECTOR_LAYER_NAME_UPPERCASE
     default y
     help
       When enabled, layer names will be converted to uppercase for display.
+
+config PROSPECTOR_TOUCH_UI
+    bool "Enable Prospector touch settings UI"
+    default n
+    depends on SHIELD_PROSPECTOR_ADAPTER
+    help
+      Enables on-screen brightness slider with Zephyr LVGL touch input.

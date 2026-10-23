@@ -10,6 +10,7 @@ if(CONFIG_SHIELD_PROSPECTOR_ADAPTER)
   zephyr_library_include_directories(${ZEPHYR_CURRENT_CMAKE_DIR}/include)
   zephyr_library_include_directories(include)
   zephyr_library_sources(src/brightness.c)
+  zephyr_library_sources_ifdef(CONFIG_PROSPECTOR_TOUCH_UI src/touch_settings.c)
   zephyr_library_sources(src/custom_status_screen.c)
   zephyr_library_sources(src/display_rotate_init.c)
 
