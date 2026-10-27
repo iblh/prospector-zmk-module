@@ -214,6 +214,12 @@ def render_operator(args: argparse.Namespace, parser: argparse.ArgumentParser) -
         ]
         if args.caps_word:
             command.append("--caps-word")
+        if args.touch_panel:
+            command.append("--touch-panel")
+        if args.device_page:
+            command.append("--device-page")
+        if args.flash_page:
+            command.append("--flash-page")
         run(command)
         raw_to_png(raw_path, args.output, args.scale)
     print(args.output)
@@ -268,6 +274,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--wpm", type=int, default=67)
     parser.add_argument("--mods", default="shift", help="Comma-separated active modifiers: gui,alt,ctrl,shift")
     parser.add_argument("--caps-word", action="store_true", help="Render shift using the caps word color")
+    parser.add_argument("--touch-panel", action="store_true", help="Show the touch settings panel")
+    parser.add_argument("--device-page", action="store_true", help="Show the device information page (host mock data)")
+    parser.add_argument("--flash-page", action="store_true", help="Show the bootloader confirmation page (no real reboot)")
     parser.add_argument("--modifier-order", default="GACS")
     parser.add_argument("--batteries", default="65,11", help="Comma-separated peripheral battery levels")
     parser.add_argument("--connected", default="yes,yes", help="Comma-separated peripheral connection states")

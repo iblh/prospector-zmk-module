@@ -1,4 +1,7 @@
 #include <modifier_order.h>
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+#include <prospector/input_mode.h>
+#endif
 #include <symbols.h>
 #include <string.h>
 #include <ctype.h>
@@ -17,6 +20,7 @@ static const char *symbols_mac[MOD_TYPE_COUNT] = {
     SYMBOL_COMMAND, SYMBOL_OPTION, SYMBOL_CONTROL, SYMBOL_SHIFT
 };
 
+#ifndef CONFIG_PROSPECTOR_INPUT_MODES
 #if defined(CONFIG_PROSPECTOR_MODIFIER_OS_MAC)
 static const char *texts[MOD_TYPE_COUNT] = {
     "CMD", "OPT", "CTRL", "SHFT"
@@ -29,6 +33,8 @@ static const char *texts[MOD_TYPE_COUNT] = {
 static const char *texts[MOD_TYPE_COUNT] = {
     "GUI", "ALT", "CTRL", "SHFT"
 };
+#endif
+
 #endif
 
 static enum modifier_type char_to_modifier(char ch) {
@@ -84,11 +90,19 @@ enum modifier_type modifier_order_get(int position) {
 }
 
 bool modifier_order_uses_symbols(void) {
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+    return false; /* A shared text object can change CMD/OPT to WIN/ALT. */
+#else
     return IS_ENABLED(CONFIG_PROSPECTOR_MODIFIER_OS_MAC);
+#endif
 }
 
 bool modifier_order_is_windows(void) {
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+    return false; /* This helper selects the fixed Windows icon object. */
+#else
     return IS_ENABLED(CONFIG_PROSPECTOR_MODIFIER_OS_WINDOWS);
+#endif
 }
 
 const char *modifier_order_get_symbol(int position) {
@@ -96,5 +110,11 @@ const char *modifier_order_get_symbol(int position) {
 }
 
 const char *modifier_order_get_text(int position) {
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+    static const char *const mac[] = {"CMD", "OPT", "CTRL", "SHFT"};
+    static const char *const win[] = {"WIN", "ALT", "CTRL", "SHFT"};
+    return (prospector_input_mode_get() == PROSPECTOR_MAC_DV ? mac : win)[modifier_order_get(position)];
+#else
     return texts[modifier_order_get(position)];
+#endif
 }

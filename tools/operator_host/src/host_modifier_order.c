@@ -1,4 +1,5 @@
 #include <modifier_order.h>
+#include <prospector/input_mode.h>
 
 #include <ctype.h>
 #include <string.h>
@@ -65,5 +66,11 @@ const char *modifier_order_get_symbol(int position) {
 }
 
 const char *modifier_order_get_text(int position) {
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+    static const char *mac[] = {"CMD", "OPT", "CTRL", "SHFT"};
+    static const char *win[] = {"WIN", "ALT", "CTRL", "SHFT"};
+    return (prospector_input_mode_get() == 0 ? mac : win)[modifier_order_get(position)];
+#else
     return texts[modifier_order_get(position)];
+#endif
 }

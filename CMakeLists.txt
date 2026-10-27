@@ -25,3 +25,9 @@ if(CONFIG_SHIELD_PROSPECTOR_ADAPTER)
         zephyr_library_sources(src/split/bluetooth/central_status_changed_observer.c)
 
 endif()
+
+if(CONFIG_PROSPECTOR_INPUT_MODES)
+  target_sources(app PRIVATE src/input_mode.c src/behaviors/behavior_input_mode.c
+    src/behaviors/behavior_shortcut.c)
+  zephyr_link_libraries(-Wl,--wrap=raise_zmk_position_state_changed)
+endif()

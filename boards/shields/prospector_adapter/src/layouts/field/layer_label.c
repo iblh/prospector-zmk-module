@@ -6,6 +6,9 @@
 #include <zmk/keymap.h>
 
 #include <fonts.h>
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+#include <prospector/input_mode.h>
+#endif
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
 
@@ -15,6 +18,11 @@ struct layer_label_state {
 
 static void layer_label_set_text(lv_obj_t *label, struct layer_label_state state) {
     const char *layer_name = zmk_keymap_layer_name(zmk_keymap_layer_index_to_id(state.index));
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+    char mode_layer[16];
+    prospector_input_mode_format_layer(state.index, mode_layer, sizeof(mode_layer));
+    layer_name = mode_layer;
+#endif
     if (layer_name && *layer_name) {
         lv_label_set_text(label, layer_name);
     } else {
@@ -38,9 +46,9 @@ static struct layer_label_state layer_label_get_state(const zmk_event_t *eh) {
     };
 }
 
-ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_label, struct layer_label_state, layer_label_update_cb,
+ZMK_DISPLAY_WIDGET_LISTENER(field_widget_layer_label, struct layer_label_state, layer_label_update_cb,
                             layer_label_get_state)
-ZMK_SUBSCRIPTION(widget_layer_label, zmk_layer_state_changed);
+ZMK_SUBSCRIPTION(field_widget_layer_label, zmk_layer_state_changed);
 
 int zmk_widget_layer_label_init(struct zmk_widget_layer_label *widget, lv_obj_t *parent) {
     widget->obj = lv_label_create(parent);
@@ -51,7 +59,7 @@ int zmk_widget_layer_label_init(struct zmk_widget_layer_label *widget, lv_obj_t 
 
     sys_slist_append(&widgets, &widget->node);
 
-    widget_layer_label_init();
+    field_widget_layer_label_init();
     return 0;
 }
 

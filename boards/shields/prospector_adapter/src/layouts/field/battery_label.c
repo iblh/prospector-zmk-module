@@ -62,9 +62,9 @@ static struct battery_state get_battery_state(const zmk_event_t *eh) {
     return (struct battery_state){.source = 0, .level = 0};
 }
 
-ZMK_DISPLAY_WIDGET_LISTENER(widget_battery_label_battery, struct battery_state,
+ZMK_DISPLAY_WIDGET_LISTENER(field_widget_battery_label_battery, struct battery_state,
                             battery_update_cb, get_battery_state);
-ZMK_SUBSCRIPTION(widget_battery_label_battery, zmk_peripheral_battery_state_changed);
+ZMK_SUBSCRIPTION(field_widget_battery_label_battery, zmk_peripheral_battery_state_changed);
 
 struct connection_state {
     uint8_t source;
@@ -87,9 +87,9 @@ static struct connection_state get_connection_state(const zmk_event_t *eh) {
     return (struct connection_state){.source = 0, .connected = false};
 }
 
-ZMK_DISPLAY_WIDGET_LISTENER(widget_battery_label_connection, struct connection_state,
+ZMK_DISPLAY_WIDGET_LISTENER(field_widget_battery_label_connection, struct connection_state,
                             connection_update_cb, get_connection_state);
-ZMK_SUBSCRIPTION(widget_battery_label_connection, zmk_split_central_status_changed);
+ZMK_SUBSCRIPTION(field_widget_battery_label_connection, zmk_split_central_status_changed);
 
 int zmk_widget_battery_label_init(struct zmk_widget_battery_label *widget, lv_obj_t *parent) {
     widget->obj = lv_label_create(parent);
@@ -106,8 +106,8 @@ int zmk_widget_battery_label_init(struct zmk_widget_battery_label *widget, lv_ob
 
     sys_slist_append(&widgets, &widget->node);
 
-    widget_battery_label_battery_init();
-    widget_battery_label_connection_init();
+    field_widget_battery_label_battery_init();
+    field_widget_battery_label_connection_init();
 
     update_label_text(widget->obj);
 

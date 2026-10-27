@@ -4,10 +4,25 @@
 #include <stdlib.h>
 #include <string.h>
 #include <zmk/events/caps_word_state_changed.h>
+#include <prospector/device_screen.h>
 
 lv_obj_t *zmk_display_status_screen(void);
-int widget_modifier_indicator_cb(const zmk_event_t *eh);
+int operator_widget_modifier_indicator_cb(const zmk_event_t *eh);
 static uint32_t ticks;
+void host_device_screen_tests(void);
+
+void host_advance_time(uint32_t ms) {
+    for (uint32_t elapsed = 0; elapsed < ms; elapsed += 5) {
+        ticks += 5;
+        lv_timer_handler();
+    }
+}
+
+static void host_flush(lv_display_t *display, const lv_area_t *area, uint8_t *pixels) {
+    (void)area;
+    (void)pixels;
+    lv_display_flush_ready(display);
+}
 
 uint32_t custom_tick_get(void) {
     return ticks;
@@ -95,6 +110,13 @@ int main(int argc, char **argv) {
     int active_layer = 0;
     int profile = 1;
     bool caps_word = false;
+    bool touch_panel = false;
+    bool device_page = false;
+    bool flash_page = false;
+    bool modes_page = false;
+    const char *layout = "operator";
+    int input_mode = 0;
+    bool device_tests = false;
     enum zmk_transport transport = ZMK_TRANSPORT_USB;
 
     for (int i = 1; i < argc; i++) {
@@ -121,12 +143,27 @@ int main(int argc, char **argv) {
                                                                       : ZMK_TRANSPORT_USB;
         } else if (strcmp(argv[i], "--profile") == 0) {
             profile = atoi(arg_value(&i, argc, argv));
+        } else if (strcmp(argv[i], "--touch-panel") == 0) {
+            touch_panel = true;
+        } else if (strcmp(argv[i], "--device-page") == 0) {
+            device_page = true;
+        } else if (strcmp(argv[i], "--modes-page") == 0) {
+            device_page = modes_page = true;
+        } else if (strcmp(argv[i], "--flash-page") == 0) {
+            device_page = flash_page = true;
+        } else if (strcmp(argv[i], "--layout") == 0) {
+            layout = arg_value(&i, argc, argv);
+        } else if (strcmp(argv[i], "--input-mode") == 0) {
+            input_mode = atoi(arg_value(&i, argc, argv));
+        } else if (strcmp(argv[i], "--device-tests") == 0) {
+            device_tests = true;
         }
     }
 
     lv_init();
     lv_tick_set_cb(custom_tick_get);
     lv_display_t *display = lv_display_create(280, 240);
+    lv_display_set_flush_cb(display, host_flush);
     static uint8_t draw_buf[280 * 240 * 4];
     lv_display_set_buffers(display, draw_buf, NULL, sizeof(draw_buf), LV_DISPLAY_RENDER_MODE_DIRECT);
 
@@ -137,19 +174,64 @@ int main(int argc, char **argv) {
     host_state_set_profile((uint8_t)(profile - 1));
     host_modifier_order_set(order);
 
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+    extern int host_mode;
+    host_mode = input_mode;
+#endif
     lv_obj_t *screen = zmk_display_status_screen();
+#ifdef PROSPECTOR_HOST_ALL_LAYOUTS
+    extern lv_obj_t *prospector_screen_classic(void);
+    extern lv_obj_t *prospector_screen_field(void);
+    lv_obj_t *classic = prospector_screen_classic();
+    lv_obj_t *field = prospector_screen_field();
+    if (!strcmp(layout, "classic")) { screen = classic; }
+    if (!strcmp(layout, "field")) { screen = field; }
+#endif
     lv_obj_set_size(screen, 280, 240);
     lv_screen_load(screen);
 
     if (caps_word) {
         struct zmk_caps_word_state_changed ev = {.active = true};
-        widget_modifier_indicator_cb((const zmk_event_t *)&ev);
+        operator_widget_modifier_indicator_cb((const zmk_event_t *)&ev);
     }
     apply_batteries(batteries, connected);
 
     lv_obj_update_layout(screen);
 
-    lv_draw_buf_t *snapshot = lv_snapshot_take(screen, LV_COLOR_FORMAT_ARGB8888);
+    if (device_tests) {
+        host_device_screen_tests();
+        return 0;
+    }
+    if (device_page) {
+        prospector_device_screen_open();
+        if (flash_page) {
+            lv_obj_t *panel = lv_obj_get_child(lv_layer_top(), -1);
+            lv_obj_t *info = lv_obj_get_child(panel, 0);
+            lv_obj_send_event(lv_obj_get_child(info, 3), LV_EVENT_CLICKED, NULL);
+        }
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+        if (modes_page) {
+            lv_obj_t *panel = lv_obj_get_child(lv_layer_top(), -1);
+            lv_obj_t *info = lv_obj_get_child(panel, 0);
+            lv_obj_send_event(lv_obj_get_child(info, 4), LV_EVENT_CLICKED, NULL);
+        }
+#endif
+        lv_obj_update_layout(lv_layer_top());
+    }
+
+    lv_mem_monitor_t memory;
+    lv_mem_monitor(&memory);
+    fprintf(stderr, "LVGL operator heap used: %zu bytes\n",
+            memory.total_size - memory.free_size);
+
+    if (touch_panel) {
+        lv_obj_t *panel = lv_obj_get_child(screen, -1);
+        lv_obj_remove_flag(panel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_update_layout(screen);
+    }
+
+    lv_draw_buf_t *snapshot = lv_snapshot_take(device_page ? lv_obj_get_child(lv_layer_top(), -1) : screen,
+                                               LV_COLOR_FORMAT_ARGB8888);
     if (!snapshot) {
         fprintf(stderr, "Failed to capture LVGL snapshot\n");
         return 1;

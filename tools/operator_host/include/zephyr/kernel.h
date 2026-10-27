@@ -97,3 +97,10 @@ static inline void sys_slist_append(sys_slist_t *list, sys_snode_t *node) {
 #define _XXXX1 _YYYY,
 #define IS_ENABLED2(one_or_two_args) IS_ENABLED3(one_or_two_args 1, 0)
 #define IS_ENABLED3(ignore_this, val, ...) val
+
+uint32_t lv_tick_get(void);
+static inline uint32_t k_uptime_get_32(void) { return lv_tick_get(); }
+
+#define K_SECONDS(x) ((x)*1000)
+static inline uint32_t k_cycle_get_32(void) { return lv_tick_get() * 1000; }
+static inline uint32_t k_cyc_to_us_floor32(uint32_t t) { return t; }

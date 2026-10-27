@@ -5,6 +5,7 @@
 #include <zmk/events/caps_word_state_changed.h>
 #endif
 #include <zmk/events/keycode_state_changed.h>
+#include <zmk/events/layer_state_changed.h>
 #include <zmk/event_manager.h>
 #include <zmk/hid.h>
 #include <dt-bindings/zmk/hid_usage.h>
@@ -84,6 +85,9 @@ static void modifier_update_cb(struct modifier_state state) {
 #ifdef CONFIG_PROSPECTOR_SHOW_MODIFIERS
         bool is_windows = modifier_order_is_windows();
         for (int i = 0; i < 4; i++) {
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+            lv_label_set_text(widget->mod_labels[i], modifier_order_get_text(i));
+#endif
             enum modifier_type type = modifier_order_get(i);
             bool active = state.mods[type];
             bool is_win_icon = is_windows && type == MOD_TYPE_GUI;
@@ -140,15 +144,18 @@ static struct modifier_state modifier_indicator_get_state(const zmk_event_t *eh)
     return state;
 }
 
-ZMK_DISPLAY_WIDGET_LISTENER(widget_modifier_indicator, struct modifier_state,
+ZMK_DISPLAY_WIDGET_LISTENER(classic_widget_modifier_indicator, struct modifier_state,
                             modifier_update_cb, modifier_indicator_get_state)
 
 #ifdef CONFIG_PROSPECTOR_SHOW_MODIFIERS
-ZMK_SUBSCRIPTION(widget_modifier_indicator, zmk_keycode_state_changed);
+ZMK_SUBSCRIPTION(classic_widget_modifier_indicator, zmk_keycode_state_changed);
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+ZMK_SUBSCRIPTION(classic_widget_modifier_indicator, zmk_layer_state_changed);
+#endif
 #endif
 
 #ifdef CONFIG_DT_HAS_ZMK_BEHAVIOR_CAPS_WORD_ENABLED
-ZMK_SUBSCRIPTION(widget_modifier_indicator, zmk_caps_word_state_changed);
+ZMK_SUBSCRIPTION(classic_widget_modifier_indicator, zmk_caps_word_state_changed);
 #endif
 
 int zmk_widget_modifier_indicator_init(struct zmk_widget_modifier_indicator *widget,
@@ -190,7 +197,7 @@ int zmk_widget_modifier_indicator_init(struct zmk_widget_modifier_indicator *wid
 
     sys_slist_append(&widgets, &widget->node);
 
-    widget_modifier_indicator_init();
+    classic_widget_modifier_indicator_init();
 
     return 0;
 }

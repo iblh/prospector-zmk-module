@@ -5,7 +5,19 @@ This is a [ZMK module](https://zmk.dev/docs/features/modules) that provides cust
 ![Four status screen layouts for Prospector](docs/images/status-screen-update-hero.png)
 
 > [!IMPORTANT]
-> This branch is a work-in-progress and is only compatible with the Zephyr 4.1 version of ZMK (current main).
+> This branch targets the Zephyr 4.1 ZMK stack. The companion firmware manifest pins the tested commits; newer upstream main revisions are not assumed compatible.
+
+## Touch Edition candidate
+
+With `CONFIG_PROSPECTOR_TOUCH_UI=y`, runtime layouts are Classic / Field / Operator;
+Radii remains available only to upstream compile-time builds. Touch supplies manual
+10–100% brightness, swipe navigation, a device page and confirmed UF2 entry.
+Optional MAC-DV / WIN-DV / GAME input modes require the companion dedicated keymap.
+
+Touch mapping, PWM, idle/touch wake and T4-01 device/UF2 UI have user acceptance.
+T5-01 typing, BLE pairing, GAME and keyboard wake are pending physical verification.
+See the [project guide](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/docs/11-input-modes-guide.md)
+and [current acceptance record](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/docs/06-roadmap-and-acceptance.md).
 
 ## Table of Contents
 
@@ -128,6 +140,54 @@ Additional commands are available:
 
 `PBL_INC` and `PBL_DEC` use `CONFIG_PROSPECTOR_BRIGHTNESS_STEP`, which defaults to `10`.
 
+For `CONFIG_PROSPECTOR_TOUCH_UI=y`, the touch slider and `&pbl` manual commands share one
+requested brightness value. A change schedules small backlight steps on a work queue;
+the LVGL and key event callbacks do not wait for the fade. Manual changes are saved after
+1.2 seconds without another change under `prospector_touch/brightness` in Zephyr Settings.
+The saved value is loaded before ZMK initializes the display. The UI refreshes its slider
+from that value when the settings panel opens. This is software behavior only: actual
+backlight dimming depends on a verified PWM connection to the LCD backlight circuit.
+The touch build compiles Classic, Field, and Operator in one image.
+Swipe left for the next layout or right for the previous layout; swipe down on the
+status screen to open brightness, then tap CLOSE to return. The LIGHT button is
+removed, and Operator's full-width modifier row is restored. Status children are
+read-only touch targets so the Classic roller cannot consume navigation gestures.
+The runtime build starts with only Operator and creates each other screen on first visit. Created screens stay
+allocated because ZMK listeners retain widget pointers. Field's animation timer runs
+only while Field is visible. Layout choices are saved, but this diagnostic build
+intentionally starts in Operator on every boot until safe restoration is proven.
+The firmware uses Zephyr's `CONFIG_LV_Z_MEM_POOL_SIZE` for the object heap (49,152
+bytes in this diagnostic build), with heap statistics enabled. Runtime heap
+capacity, gestures, and keyboard latency still need physical validation.
+
+The user confirmed both the compact four-layout build's layout/swipe tests and the
+current three-layout revision's layout cycling and swipe-down brightness entry.
+Reboot persistence, wake-touch consumption, and keyboard HID remain separate tests.
+Persisted layout IDs remain stable, with the old Radii ID retired.
+
+Swipe up on a status screen to open the shared DEVICE page. It shows firmware
+release, build time (America/Los_Angeles), working-source content fingerprint,
+current built keymap label, USB readiness and BLE slot K1/K2 connectivity. Slot
+numbers do not imply verified physical left/right identity. The current keymap is
+QWERTY; the planned MAC-DV/WIN-DV/GAME selector is not implemented yet.
+
+FLASH opens confirmation; a separate continuous two-second hold requests UF2 mode.
+Early release, slide-out, CANCEL, timeout and idle cancel it. The reboot worker uses
+ZMK's bootmode mapping, checks failure before reboot, and does not clear settings.
+This feature passes local UI/service mock tests; actual NICENANO mounting is still
+pending device validation. Keep the verified three-layout UF2 for rollback.
+
+The user's clone runs UF2 Bootloader 0.6.0, which accepts application writes only
+below `0xAD000`. The first two four-layout images exceeded that boundary and were
+not installed completely. Touch builds now generate compact font sources in the
+build directory: role-specific glyph subsets, sparse maps, and lossless RLE with
+row XOR. Original font sources are retained. Run
+`python3 tools/test_compressed_fonts.py /path/to/lvgl` to check the generated maps
+and every retained glyph against LVGL's C decoder. If a widget starts using a new
+character in a numeric/modifier font, update `tools/compress_lvgl_fonts.py` too.
+The workspace build wrapper checks UF2 vectors, family, and bootloader address
+limits before reporting success. These checks do not establish hardware acceptance.
+
 ## Idle Timeout (Display + Backlight)
 
 `CONFIG_ZMK_IDLE_TIMEOUT` controls when ZMK transitions from `ACTIVE` to `IDLE` after no input activity.
@@ -147,7 +207,7 @@ When that timeout is reached:
 When activity returns:
 - The display is unblanked by ZMK.
 - Backlight is restored by this module:
-  - fixed mode: `CONFIG_PROSPECTOR_FIXED_BRIGHTNESS`
+  - fixed/manual mode: the last requested manual brightness (initially `CONFIG_PROSPECTOR_FIXED_BRIGHTNESS`)
   - ambient mode: current sensor-driven brightness
 
 Set the timeout in your dongle `.conf` file (value is in milliseconds):
@@ -180,7 +240,7 @@ CONFIG_PROSPECTOR_FIXED_BRIGHTNESS=80
 
 > [!NOTE]
 > Prospector display backlight is forced to `0` when ZMK enters `IDLE` or `SLEEP`, and restored when activity returns to `ACTIVE`.
-> In fixed mode it restores to `CONFIG_PROSPECTOR_FIXED_BRIGHTNESS`; in ambient-light mode it restores to the current sensor-driven brightness.
+> In fixed/manual mode it restores to the last requested manual brightness; in ambient-light mode it restores to the current sensor-driven brightness.
 
 When ambient-light brightness is enabled, Prospector uses a module-owned APDS9960 patch driver
 (`CONFIG_PROSPECTOR_APDS9960`). It keeps the normal Zephyr sensor API in use while narrowing the
@@ -226,3 +286,26 @@ CONFIG_LV_Z_VDB_SIZE=25
 - Radii: document and improve color theme customization
 - OS-specific modifier styles
 - Caps lock indication
+
+
+### Prospector Touch input modes (local T5-01 candidate)
+
+`CONFIG_PROSPECTOR_INPUT_MODES` requires the dedicated firmware-side
+`touch_modes.keymap`: complete MAC-DV / WIN-DV / GAME bases (IDs 0/1/2), temporary
+NUM/NAV/SYM/FN/SLOW/SCROLL layers (IDs 3–8). Swipe up → DEVICE → MODE selects the
+input mode independently of Classic/Field/Operator appearance. The mode worker
+waits for all received physical positions to release, 350ms quiet and neutral HID
+reports. A GNU ld position-event wrapper observes fresh events before hold-tap
+capture, with no upstream ZMK source edits. Do not remove it or replace it with a
+late event subscription. The dedicated keymap's longest hold-tap is 280ms.
+
+Typing uses native mod-morph with keep-mods, while GAME letters and primary thumbs
+are direct. Mode labels and CMD/OPT versus WIN/ALT update at runtime. Default mode
+is MAC-DV; no new settings persistence or BLE host switching is added. Tests live
+in `tools/test_input_modes.py` and `tools/test_device_service.py`. The real-source
+LVGL host also supports `PROSPECTOR_HOST_INPUT_MODES=ON` and
+`PROSPECTOR_HOST_ALL_LAYOUTS=ON` for mode/confirmation input tests and previews.
+
+The local build is a candidate: keyboard-half flashing, BLE pairing, HID shortcuts,
+GAME and trackball behavior require physical acceptance. Full workspace keymap,
+reproduction and pairing guide: [input-mode guide](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/docs/11-input-modes-guide.md).

@@ -3,9 +3,23 @@
 Use `tools/render_operator_status.py` to generate Operator status screen images
 for docs and visual checks.
 
-The script compiles the real Operator LVGL widget C files and converted LVGL
-fonts, injects configurable ZMK state through host stubs, captures the LVGL
-framebuffer, and writes a PNG.
+The script compiles the real Operator LVGL widget C files, touch settings UI,
+and converted LVGL fonts, injects configurable ZMK state through host stubs,
+captures the LVGL framebuffer, and writes a PNG. Its touch-enabled render
+checks visual placement; it does not emulate the CST816T or verify taps. The
+host LVGL config disables all themes to match the firmware. Use `--touch-panel`
+to render the settings panel and slider.
+
+The current status render has no LIGHT button. Operator's modifier container uses
+the original 230-pixel width at `(25, 8)`. Swipe-down access is verified separately
+on hardware; the host renderer checks appearance only.
+
+Use `--device-page` or `--flash-page` for DEVICE and UF2 confirmation previews.
+Device metadata/connection state in host previews are mock data; no host preview
+can reboot a physical board. The built `operator_renderer --device-tests` exercises
+actual LVGL pointer sampling/timers with a mocked reboot service. Run
+`python3 tools/test_device_service.py` to test the real service C against host
+platform shims, including retained-write failure and no-reboot checks.
 
 ## Dependency Cache
 

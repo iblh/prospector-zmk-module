@@ -5,6 +5,7 @@
 #include <zmk/events/caps_word_state_changed.h>
 #endif
 #include <zmk/events/keycode_state_changed.h>
+#include <zmk/events/layer_state_changed.h>
 #include <zmk/event_manager.h>
 #include <zmk/hid.h>
 
@@ -35,6 +36,9 @@ static void modifier_indicator_update_cb(struct modifier_indicator_state state) 
     struct zmk_widget_modifier_indicator *widget;
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
         for (int i = 0; i < 4; i++) {
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+            lv_label_set_text(widget->mod_labels[i], modifier_order_get_text(i));
+#endif
             enum modifier_type type = modifier_order_get(i);
 #ifdef CONFIG_DT_HAS_ZMK_BEHAVIOR_CAPS_WORD_ENABLED
             if (type == MOD_TYPE_SHIFT && state.caps_word) {
@@ -75,12 +79,15 @@ static struct modifier_indicator_state modifier_indicator_get_state(const zmk_ev
     return state;
 }
 
-ZMK_DISPLAY_WIDGET_LISTENER(widget_modifier_indicator, struct modifier_indicator_state,
+ZMK_DISPLAY_WIDGET_LISTENER(operator_widget_modifier_indicator, struct modifier_indicator_state,
                             modifier_indicator_update_cb, modifier_indicator_get_state)
-ZMK_SUBSCRIPTION(widget_modifier_indicator, zmk_keycode_state_changed);
+ZMK_SUBSCRIPTION(operator_widget_modifier_indicator, zmk_keycode_state_changed);
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+ZMK_SUBSCRIPTION(operator_widget_modifier_indicator, zmk_layer_state_changed);
+#endif
 
 #ifdef CONFIG_DT_HAS_ZMK_BEHAVIOR_CAPS_WORD_ENABLED
-ZMK_SUBSCRIPTION(widget_modifier_indicator, zmk_caps_word_state_changed);
+ZMK_SUBSCRIPTION(operator_widget_modifier_indicator, zmk_caps_word_state_changed);
 #endif
 
 static lv_obj_t *create_mod_label(lv_obj_t *parent, const char *text) {
@@ -107,7 +114,7 @@ int zmk_widget_modifier_indicator_init(struct zmk_widget_modifier_indicator *wid
     }
 
     sys_slist_append(&widgets, &widget->node);
-    widget_modifier_indicator_init();
+    operator_widget_modifier_indicator_init();
 
     return 0;
 }

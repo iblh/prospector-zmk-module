@@ -161,6 +161,16 @@ static uint64_t modifier_excluded_cells = 0;  // From modifiers (set via API)
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
 static lv_timer_t *animation_timer = NULL;
+
+void prospector_field_animation_set_active(bool active) {
+    if (animation_timer) {
+        if (active) {
+            lv_timer_resume(animation_timer);
+        } else {
+            lv_timer_pause(animation_timer);
+        }
+    }
+}
 static uint32_t last_timer_period = 33;
 
 static float lines_noise(float x, float y, float t) {
@@ -192,8 +202,8 @@ static int wpm_event_handler(const zmk_event_t *eh) {
     return ZMK_EV_EVENT_BUBBLE;
 }
 
-ZMK_LISTENER(widget_line_segments, wpm_event_handler);
-ZMK_SUBSCRIPTION(widget_line_segments, zmk_wpm_state_changed);
+ZMK_LISTENER(field_widget_line_segments, wpm_event_handler);
+ZMK_SUBSCRIPTION(field_widget_line_segments, zmk_wpm_state_changed);
 
 // Calculate how many columns a label width covers (starting from column 0)
 static int width_to_columns(int width) {

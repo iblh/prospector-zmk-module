@@ -31,9 +31,9 @@ static struct layer_display_state layer_display_get_state(const zmk_event_t *eh)
     };
 }
 
-ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_display, struct layer_display_state,
+ZMK_DISPLAY_WIDGET_LISTENER(operator_widget_layer_display, struct layer_display_state,
                             layer_display_update_cb, layer_display_get_state)
-ZMK_SUBSCRIPTION(widget_layer_display, zmk_layer_state_changed);
+ZMK_SUBSCRIPTION(operator_widget_layer_display, zmk_layer_state_changed);
 
 int zmk_widget_layer_display_init(struct zmk_widget_layer_display *widget, lv_obj_t *parent) {
     widget->obj = lv_obj_create(parent);
@@ -59,7 +59,7 @@ int zmk_widget_layer_display_init(struct zmk_widget_layer_display *widget, lv_ob
     }
 
     sys_slist_append(&widgets, &widget->node);
-    widget_layer_display_init();
+    operator_widget_layer_display_init();
 
     return 0;
 }

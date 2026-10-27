@@ -4,12 +4,18 @@
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
+#include <errno.h>
+#include <string.h>
+
+#if defined(CONFIG_PROSPECTOR_TOUCH_UI)
+#include <zephyr/settings/settings.h>
+#endif
 
 #include <prospector/brightness.h>
 #include <zephyr/logging/log.h>
 #include <zmk/event_manager.h>
 #include <zmk/events/activity_state_changed.h>
-LOG_MODULE_REGISTER(als, 4);
+LOG_MODULE_REGISTER(prospector_brightness, LOG_LEVEL_INF);
 
 static const struct device *pwm_leds_dev = DEVICE_DT_GET_ONE(pwm_leds);
 #define DISP_BL DT_NODE_CHILD_IDX(DT_NODELABEL(disp_bl))
@@ -37,70 +43,83 @@ static bool backlight_active = true;
 static bool auto_brightness_enabled = PROSPECTOR_DEFAULT_AUTO_MODE;
 K_MUTEX_DEFINE(brightness_lock);
 
-#define PWM_MIN 1   // Minimum PWM duty cycle (%) - keep display visible
+#define PWM_MIN 10  // Keep manual brightness usable and avoid an overly dim panel
 #define PWM_MAX 100 // Maximum PWM duty cycle (%)
 
-#define FADE_STEP 1
 #define FADE_SLEEP_BRIGHTEN_MS 3
 #define FADE_SLEEP_DARKEN_MS 10
 
+static void brightness_work_handler(struct k_work *work);
+K_WORK_DELAYABLE_DEFINE(brightness_work, brightness_work_handler);
+
+#if defined(CONFIG_PROSPECTOR_TOUCH_UI)
+#define BRIGHTNESS_SETTING "prospector_touch/brightness"
+#define BRIGHTNESS_SAVE_DELAY K_MSEC(1200)
+
+static uint8_t saved_brightness = PROSPECTOR_DEFAULT_BRIGHTNESS;
+static void brightness_save_work_handler(struct k_work *work);
+K_WORK_DELAYABLE_DEFINE(brightness_save_work, brightness_save_work_handler);
+#endif
+
 static uint8_t clamp_brightness(uint8_t brightness) { return CLAMP(brightness, PWM_MIN, PWM_MAX); }
 
-static void set_displayed_brightness(uint8_t brightness) {
+/* One PWM update per invocation keeps LVGL and ZMK event handlers responsive. */
+static void brightness_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+    uint8_t current;
+    uint8_t target;
+
     k_mutex_lock(&brightness_lock, K_FOREVER);
-    displayed_brightness = brightness;
+    current = displayed_brightness;
+    target = backlight_active ? target_brightness : 0;
     k_mutex_unlock(&brightness_lock);
-}
 
-static int bl_fade(uint8_t source, uint8_t target) {
-    bool increasing = target > source;
-    uint8_t brightness = source;
-
-    if (source == target) {
-        set_displayed_brightness(target);
-        return 0;
+    if (current == target) {
+        return;
     }
 
-    while ((increasing && brightness < target) || (!increasing && brightness > target)) {
-        int rc;
-
-        if (increasing) {
-            brightness = MIN(brightness + FADE_STEP, target);
-        } else {
-            brightness = MAX(brightness - FADE_STEP, target);
-        }
-
-        rc = set_backlight_brightness(brightness);
-        if (rc != 0) {
-            return rc;
-        }
-
-        set_displayed_brightness(brightness);
-        k_msleep(increasing ? FADE_SLEEP_BRIGHTEN_MS : FADE_SLEEP_DARKEN_MS);
+    uint8_t next = current < target ? current + 1 : current - 1;
+    if (set_backlight_brightness(next) != 0) {
+        return;
     }
 
-    return 0;
+    k_mutex_lock(&brightness_lock, K_FOREVER);
+    displayed_brightness = next;
+    target = backlight_active ? target_brightness : 0;
+    k_mutex_unlock(&brightness_lock);
+
+    if (next != target) {
+        (void)k_work_reschedule(&brightness_work,
+                                K_MSEC(next < target ? FADE_SLEEP_BRIGHTEN_MS
+                                                     : FADE_SLEEP_DARKEN_MS));
+    }
 }
 
 static int set_target_brightness(uint8_t brightness, bool manual_mode) {
-    uint8_t source;
     uint8_t target = clamp_brightness(brightness);
-    bool active;
 
     k_mutex_lock(&brightness_lock, K_FOREVER);
     if (manual_mode) {
         auto_brightness_enabled = false;
     }
     target_brightness = target;
-    source = displayed_brightness;
-    active = backlight_active;
     k_mutex_unlock(&brightness_lock);
 
-    if (!active) {
-        return 0;
+    (void)k_work_reschedule(&brightness_work, K_NO_WAIT);
+#if defined(CONFIG_PROSPECTOR_TOUCH_UI)
+    if (manual_mode) {
+        (void)k_work_reschedule(&brightness_save_work, BRIGHTNESS_SAVE_DELAY);
     }
+#endif
+    return 0;
+}
 
-    return bl_fade(source, target);
+static int set_backlight_active(bool active) {
+    k_mutex_lock(&brightness_lock, K_FOREVER);
+    backlight_active = active;
+    k_mutex_unlock(&brightness_lock);
+    (void)k_work_reschedule(&brightness_work, K_NO_WAIT);
+    return 0;
 }
 
 int prospector_brightness_auto_on(void) {
@@ -136,6 +155,15 @@ int prospector_brightness_set_manual(uint8_t brightness) {
     return set_target_brightness(brightness, true);
 }
 
+uint8_t prospector_brightness_get_manual(void) {
+    uint8_t value;
+
+    k_mutex_lock(&brightness_lock, K_FOREVER);
+    value = target_brightness;
+    k_mutex_unlock(&brightness_lock);
+    return value;
+}
+
 int prospector_brightness_manual_step(int direction) {
     uint8_t next;
 
@@ -159,6 +187,72 @@ bool prospector_brightness_is_auto(void) {
 
     return enabled;
 }
+
+#if defined(CONFIG_PROSPECTOR_TOUCH_UI)
+static int brightness_settings_set(const char *name, size_t len,
+                                   settings_read_cb read_cb, void *cb_arg) {
+    uint8_t value;
+    int rc;
+
+    if (strcmp(name, "brightness") != 0) {
+        return -ENOENT;
+    }
+    if (len != sizeof(value)) {
+        return -EINVAL;
+    }
+
+    rc = read_cb(cb_arg, &value, sizeof(value));
+    if (rc < 0) {
+        return rc;
+    }
+    if (rc != sizeof(value) || value < PWM_MIN || value > PWM_MAX) {
+        return -EINVAL;
+    }
+
+    k_mutex_lock(&brightness_lock, K_FOREVER);
+    target_brightness = value;
+    saved_brightness = value;
+    auto_brightness_enabled = false;
+    k_mutex_unlock(&brightness_lock);
+    return 0;
+}
+
+static int brightness_settings_commit(void) {
+    (void)k_work_reschedule(&brightness_work, K_NO_WAIT);
+    return 0;
+}
+
+SETTINGS_STATIC_HANDLER_DEFINE(prospector_touch, "prospector_touch", NULL,
+                               brightness_settings_set, brightness_settings_commit, NULL);
+
+static void brightness_save_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+    uint8_t value;
+
+    k_mutex_lock(&brightness_lock, K_FOREVER);
+    value = target_brightness;
+    bool unchanged = value == saved_brightness;
+    k_mutex_unlock(&brightness_lock);
+
+    if (unchanged) {
+        return;
+    }
+
+    int rc = settings_save_one(BRIGHTNESS_SETTING, &value, sizeof(value));
+    if (rc != 0) {
+        LOG_ERR("Failed to save brightness: %d", rc);
+        return;
+    }
+
+    k_mutex_lock(&brightness_lock, K_FOREVER);
+    saved_brightness = value;
+    bool changed_again = target_brightness != value;
+    k_mutex_unlock(&brightness_lock);
+    if (changed_again) {
+        (void)k_work_reschedule(&brightness_save_work, BRIGHTNESS_SAVE_DELAY);
+    }
+}
+#endif
 
 #ifdef CONFIG_PROSPECTOR_USE_AMBIENT_LIGHT_SENSOR
 
@@ -301,22 +395,11 @@ static int als_brightness_activity_listener(const zmk_event_t *eh) {
     }
 
     switch (ev->state) {
-    case ZMK_ACTIVITY_ACTIVE: {
-        k_mutex_lock(&brightness_lock, K_FOREVER);
-        backlight_active = true;
-        uint8_t restore_brightness = target_brightness;
-        k_mutex_unlock(&brightness_lock);
-        return bl_fade(0, restore_brightness);
-    }
+    case ZMK_ACTIVITY_ACTIVE:
+        return set_backlight_active(true);
     case ZMK_ACTIVITY_IDLE:
-    case ZMK_ACTIVITY_SLEEP: {
-        k_mutex_lock(&brightness_lock, K_FOREVER);
-        uint8_t source_brightness = displayed_brightness;
-        backlight_active = false;
-        k_mutex_unlock(&brightness_lock);
-
-        return bl_fade(source_brightness, 0);
-    }
+    case ZMK_ACTIVITY_SLEEP:
+        return set_backlight_active(false);
     default:
         return -EINVAL;
     }
@@ -338,21 +421,11 @@ static int fixed_brightness_activity_listener(const zmk_event_t *eh) {
     }
 
     switch (ev->state) {
-    case ZMK_ACTIVITY_ACTIVE: {
-        k_mutex_lock(&brightness_lock, K_FOREVER);
-        backlight_active = true;
-        uint8_t restore_brightness = target_brightness;
-        k_mutex_unlock(&brightness_lock);
-        return bl_fade(0, restore_brightness);
-    }
+    case ZMK_ACTIVITY_ACTIVE:
+        return set_backlight_active(true);
     case ZMK_ACTIVITY_IDLE:
-    case ZMK_ACTIVITY_SLEEP: {
-        k_mutex_lock(&brightness_lock, K_FOREVER);
-        uint8_t source_brightness = displayed_brightness;
-        backlight_active = false;
-        k_mutex_unlock(&brightness_lock);
-        return bl_fade(source_brightness, 0);
-    }
+    case ZMK_ACTIVITY_SLEEP:
+        return set_backlight_active(false);
     default:
         return -EINVAL;
     }

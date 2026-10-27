@@ -1,3 +1,20 @@
+config PROSPECTOR_INPUT_MODES
+    bool "MAC-DV, WIN-DV and GAME input modes"
+    depends on PROSPECTOR_TOUCH_UI && ZMK_SPLIT_ROLE_CENTRAL && ZMK_POINTING
+    default n
+    help
+      Requires the dedicated touch_modes keymap (base layers 0,1,2).
+
+config PROSPECTOR_RELEASE_TAG
+    string "Touch firmware release label"
+    default "DEV"
+    depends on PROSPECTOR_TOUCH_UI
+
+config PROSPECTOR_KEYMAP_LABEL
+    string "Built keymap label shown on device page"
+    default "QWERTY"
+    depends on PROSPECTOR_TOUCH_UI
+
 choice PROSPECTOR_STATUS_SCREEN_LAYOUT
     prompt "Status screen layout"
     default PROSPECTOR_STATUS_SCREEN_CLASSIC

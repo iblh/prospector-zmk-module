@@ -1,2 +1,7 @@
 notes.md
 .render-cache/
+
+# Regenerable local caches and Finder metadata
+__pycache__/
+*.py[cod]
+.DS_Store

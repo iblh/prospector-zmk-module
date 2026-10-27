@@ -98,11 +98,11 @@ static int ble_active_profile_changed_listener(const zmk_event_t *eh) {
     return ZMK_EV_EVENT_BUBBLE;
 }
 
-ZMK_LISTENER(widget_output_endpoint, endpoint_changed_listener);
-ZMK_SUBSCRIPTION(widget_output_endpoint, zmk_endpoint_changed);
+ZMK_LISTENER(operator_widget_output_endpoint, endpoint_changed_listener);
+ZMK_SUBSCRIPTION(operator_widget_output_endpoint, zmk_endpoint_changed);
 
-ZMK_LISTENER(widget_output_profile, ble_active_profile_changed_listener);
-ZMK_SUBSCRIPTION(widget_output_profile, zmk_ble_active_profile_changed);
+ZMK_LISTENER(operator_widget_output_profile, ble_active_profile_changed_listener);
+ZMK_SUBSCRIPTION(operator_widget_output_profile, zmk_ble_active_profile_changed);
 
 static lv_obj_t *create_toggle_btn(lv_obj_t *parent, const char *text, int x) {
     lv_obj_t *btn = lv_obj_create(parent);

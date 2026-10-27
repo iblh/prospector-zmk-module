@@ -6,6 +6,9 @@
 #include <zmk/keymap.h>
 
 #include <fonts.h>
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+#include <prospector/input_mode.h>
+#endif
 
 static char layer_names_buffer[512] = {0};
 
@@ -16,6 +19,18 @@ struct layer_roller_state {
 };
 
 static void layer_roller_set_sel(lv_obj_t *roller, struct layer_roller_state state) {
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+    size_t used = 0;
+    for (int i = 0; i < ZMK_KEYMAP_LAYERS_LEN; i++) {
+        char name[16];
+        prospector_input_mode_format_layer(i, name, sizeof(name));
+        int written = snprintf(layer_names_buffer + used, sizeof(layer_names_buffer) - used,
+                               "%s%s", i ? "\n" : "", name);
+        if (written < 0 || (size_t)written >= sizeof(layer_names_buffer) - used) { break; }
+        used += written;
+    }
+    lv_roller_set_options(roller, layer_names_buffer, LV_ROLLER_MODE_INFINITE);
+#endif
     lv_roller_set_selected(roller, state.index, LV_ANIM_ON);
 }
 
@@ -33,9 +48,9 @@ static struct layer_roller_state layer_roller_get_state(const zmk_event_t *eh) {
     };
 }
 
-ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_roller, struct layer_roller_state, layer_roller_update_cb,
+ZMK_DISPLAY_WIDGET_LISTENER(classic_widget_layer_roller, struct layer_roller_state, layer_roller_update_cb,
                             layer_roller_get_state)
-ZMK_SUBSCRIPTION(widget_layer_roller, zmk_layer_state_changed);
+ZMK_SUBSCRIPTION(classic_widget_layer_roller, zmk_layer_state_changed);
 
 int zmk_widget_layer_roller_init(struct zmk_widget_layer_roller *widget, lv_obj_t *parent) {
     widget->obj = lv_roller_create(parent);
@@ -74,7 +89,14 @@ int zmk_widget_layer_roller_init(struct zmk_widget_layer_roller *widget, lv_obj_
 
     lv_obj_add_style(widget->obj, &style, 0);
     lv_obj_set_style_bg_opa(widget->obj, LV_OPA_TRANSP, LV_PART_SELECTED);
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+    /* Six-character mode names must fit the 224px roller without clipping. */
+    lv_obj_set_style_text_font(widget->obj, &FR_Regular_36, LV_PART_SELECTED);
+    lv_obj_set_style_text_align(widget->obj, LV_TEXT_ALIGN_LEFT, LV_PART_SELECTED);
+    lv_obj_set_style_pad_left(widget->obj, 6, LV_PART_MAIN);
+#else
     lv_obj_set_style_text_font(widget->obj, &FR_Regular_48, LV_PART_SELECTED);
+#endif
     lv_obj_set_style_text_color(widget->obj, lv_color_hex(0xffffff), LV_PART_SELECTED);
     lv_obj_set_style_text_font(widget->obj, &FR_Thin_48, LV_PART_MAIN);
     lv_obj_set_style_text_color(widget->obj, lv_color_hex(0x909090), LV_PART_MAIN);
@@ -111,7 +133,7 @@ int zmk_widget_layer_roller_init(struct zmk_widget_layer_roller *widget, lv_obj_
 
     sys_slist_append(&widgets, &widget->node);
 
-    widget_layer_roller_init();
+    classic_widget_layer_roller_init();
     return 0;
 }
 

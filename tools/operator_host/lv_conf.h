@@ -14,6 +14,11 @@
 #define LV_USE_LABEL 1
 #define LV_USE_ARC 1
 #define LV_USE_BAR 1
+#define LV_USE_BUTTON 1
+#define LV_USE_SLIDER 1
+#define LV_USE_THEME_DEFAULT 0
+#define LV_USE_THEME_SIMPLE 0
+#define LV_USE_THEME_MONO 0
 #define LV_USE_FLEX 1
 #define LV_USE_SNAPSHOT 1
 #define LV_USE_SYSMON 0

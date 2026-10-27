@@ -127,13 +127,13 @@ static struct connection_update_state battery_circles_get_connection_state(const
     };
 }
 
-ZMK_DISPLAY_WIDGET_LISTENER(widget_battery_circles_battery, struct battery_update_state,
+ZMK_DISPLAY_WIDGET_LISTENER(radii_widget_battery_circles_battery, struct battery_update_state,
                             battery_circles_battery_update_cb, battery_circles_get_battery_state);
-ZMK_SUBSCRIPTION(widget_battery_circles_battery, zmk_peripheral_battery_state_changed);
+ZMK_SUBSCRIPTION(radii_widget_battery_circles_battery, zmk_peripheral_battery_state_changed);
 
-ZMK_DISPLAY_WIDGET_LISTENER(widget_battery_circles_connection, struct connection_update_state,
+ZMK_DISPLAY_WIDGET_LISTENER(radii_widget_battery_circles_connection, struct connection_update_state,
                             battery_circles_connection_update_cb, battery_circles_get_connection_state);
-ZMK_SUBSCRIPTION(widget_battery_circles_connection, zmk_split_central_status_changed);
+ZMK_SUBSCRIPTION(radii_widget_battery_circles_connection, zmk_split_central_status_changed);
 
 static lv_obj_t *create_arc(lv_obj_t *parent, int size, int x, int y, int width) {
     lv_obj_t *arc = lv_arc_create(parent);
@@ -201,8 +201,8 @@ int zmk_widget_battery_circles_init(struct zmk_widget_battery_circles *widget, l
         }
     }
 
-    widget_battery_circles_battery_init();
-    widget_battery_circles_connection_init();
+    radii_widget_battery_circles_battery_init();
+    radii_widget_battery_circles_connection_init();
 
     widget->initialized = true;
     sys_slist_append(&widgets, &widget->node);

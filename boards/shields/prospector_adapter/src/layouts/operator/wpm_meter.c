@@ -10,6 +10,9 @@
 #include <zmk/keymap.h>
 
 #include <fonts.h>
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+#include <prospector/input_mode.h>
+#endif
 #include "display_colors.h"
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
@@ -127,6 +130,11 @@ static void layer_update_cb(struct layer_state state) {
         const char *layer_name = zmk_keymap_layer_name(zmk_keymap_layer_index_to_id(state.index));
         char display_name[32];
 
+#ifdef CONFIG_PROSPECTOR_INPUT_MODES
+        char mode_layer[16];
+        prospector_input_mode_format_layer(state.index, mode_layer, sizeof(mode_layer));
+        layer_name = mode_layer;
+#endif
         if (layer_name && *layer_name) {
             snprintf(display_name, sizeof(display_name), "%s", layer_name);
         } else {
@@ -147,13 +155,13 @@ static struct layer_state layer_get_state(const zmk_event_t *eh) {
     return (struct layer_state){.index = zmk_keymap_highest_layer_active()};
 }
 
-ZMK_DISPLAY_WIDGET_LISTENER(widget_wpm_meter, struct wpm_meter_state,
+ZMK_DISPLAY_WIDGET_LISTENER(operator_widget_wpm_meter, struct wpm_meter_state,
                             wpm_meter_update_cb, wpm_meter_get_state)
-ZMK_SUBSCRIPTION(widget_wpm_meter, zmk_wpm_state_changed);
+ZMK_SUBSCRIPTION(operator_widget_wpm_meter, zmk_wpm_state_changed);
 
-ZMK_DISPLAY_WIDGET_LISTENER(widget_wpm_meter_layer, struct layer_state,
+ZMK_DISPLAY_WIDGET_LISTENER(operator_widget_wpm_meter_layer, struct layer_state,
                             layer_update_cb, layer_get_state)
-ZMK_SUBSCRIPTION(widget_wpm_meter_layer, zmk_layer_state_changed);
+ZMK_SUBSCRIPTION(operator_widget_wpm_meter_layer, zmk_layer_state_changed);
 
 int zmk_widget_wpm_meter_init(struct zmk_widget_wpm_meter *widget, lv_obj_t *parent) {
     widget->obj = lv_obj_create(parent);
@@ -212,8 +220,8 @@ int zmk_widget_wpm_meter_init(struct zmk_widget_wpm_meter *widget, lv_obj_t *par
     lv_obj_align(widget->layer_label, LV_ALIGN_BOTTOM_RIGHT, 9, 7);
 
     sys_slist_append(&widgets, &widget->node);
-    widget_wpm_meter_init();
-    widget_wpm_meter_layer_init();
+    operator_widget_wpm_meter_init();
+    operator_widget_wpm_meter_layer_init();
 
     k_work_init_delayable(&wpm_smooth_work, wpm_smooth_work_handler);
 

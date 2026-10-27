@@ -84,9 +84,9 @@ static struct layer_indicator_state layer_indicator_get_state(const zmk_event_t 
     };
 }
 
-ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_indicator, struct layer_indicator_state, layer_indicator_update_cb,
+ZMK_DISPLAY_WIDGET_LISTENER(radii_widget_layer_indicator, struct layer_indicator_state, layer_indicator_update_cb,
                             layer_indicator_get_state)
-ZMK_SUBSCRIPTION(widget_layer_indicator, zmk_layer_state_changed);
+ZMK_SUBSCRIPTION(radii_widget_layer_indicator, zmk_layer_state_changed);
 
 int zmk_widget_layer_indicator_init(struct zmk_widget_layer_indicator *widget, lv_obj_t *parent) {
     widget->container = lv_obj_create(parent);
@@ -150,7 +150,7 @@ int zmk_widget_layer_indicator_init(struct zmk_widget_layer_indicator *widget, l
     lv_label_set_text(widget->obj, "");
 
     sys_slist_append(&widgets, &widget->node);
-    widget_layer_indicator_init();
+    radii_widget_layer_indicator_init();
     return 0;
 }
 

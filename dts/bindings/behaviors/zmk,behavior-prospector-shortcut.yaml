@@ -1,0 +1,3 @@
+description: Mode aware editing shortcut (copy paste cut undo redo select all)
+compatible: "zmk,behavior-prospector-shortcut"
+include: one_param.yaml

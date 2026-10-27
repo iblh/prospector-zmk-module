@@ -143,12 +143,12 @@ static struct modifier_indicator_state modifier_indicator_get_state(const zmk_ev
     return state;
 }
 
-ZMK_DISPLAY_WIDGET_LISTENER(widget_modifier_indicator, struct modifier_indicator_state,
+ZMK_DISPLAY_WIDGET_LISTENER(radii_widget_modifier_indicator, struct modifier_indicator_state,
                             modifier_indicator_update_cb, modifier_indicator_get_state)
-ZMK_SUBSCRIPTION(widget_modifier_indicator, zmk_keycode_state_changed);
+ZMK_SUBSCRIPTION(radii_widget_modifier_indicator, zmk_keycode_state_changed);
 
 #ifdef CONFIG_DT_HAS_ZMK_BEHAVIOR_CAPS_WORD_ENABLED
-ZMK_SUBSCRIPTION(widget_modifier_indicator, zmk_caps_word_state_changed);
+ZMK_SUBSCRIPTION(radii_widget_modifier_indicator, zmk_caps_word_state_changed);
 #endif
 
 static const int32_t mod_positions[4][2] = {
@@ -186,7 +186,7 @@ int zmk_widget_modifier_indicator_init(struct zmk_widget_modifier_indicator *wid
 
     sys_slist_append(&widgets, &widget->node);
 
-    widget_modifier_indicator_init();
+    radii_widget_modifier_indicator_init();
 
     return 0;
 }
