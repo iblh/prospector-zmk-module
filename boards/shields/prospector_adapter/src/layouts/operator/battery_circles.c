@@ -8,6 +8,9 @@
 #include <zmk/event_manager.h>
 
 #include <fonts.h>
+#ifdef CONFIG_PROSPECTOR_TOUCH_UI
+#include <prospector/peripheral_state.h>
+#endif
 #include "display_colors.h"
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
@@ -322,6 +325,7 @@ void battery_circles_battery_update_cb(struct battery_update_state state) {
     }
 }
 
+#ifndef CONFIG_PROSPECTOR_TOUCH_UI
 static struct battery_update_state battery_circles_get_battery_state(const zmk_event_t *eh) {
     if (eh == NULL) {
         return (struct battery_update_state){.source = 0, .level = 0};
@@ -338,6 +342,7 @@ static struct battery_update_state battery_circles_get_battery_state(const zmk_e
         .level = bat_ev->state_of_charge,
     };
 }
+#endif
 
 void battery_circles_connection_update_cb(struct connection_update_state state) {
     struct zmk_widget_battery_circles *widget;
@@ -348,6 +353,7 @@ void battery_circles_connection_update_cb(struct connection_update_state state) 
     }
 }
 
+#ifndef CONFIG_PROSPECTOR_TOUCH_UI
 static struct connection_update_state battery_circles_get_connection_state(const zmk_event_t *eh) {
     if (eh == NULL) {
         return (struct connection_update_state){.source = 0, .connected = false};
@@ -364,7 +370,9 @@ static struct connection_update_state battery_circles_get_connection_state(const
         .connected = conn_ev->connected,
     };
 }
+#endif
 
+#ifndef CONFIG_PROSPECTOR_TOUCH_UI
 ZMK_DISPLAY_WIDGET_LISTENER(operator_widget_battery_circles_battery, struct battery_update_state,
                             battery_circles_battery_update_cb, battery_circles_get_battery_state);
 ZMK_SUBSCRIPTION(operator_widget_battery_circles_battery, zmk_peripheral_battery_state_changed);
@@ -372,6 +380,27 @@ ZMK_SUBSCRIPTION(operator_widget_battery_circles_battery, zmk_peripheral_battery
 ZMK_DISPLAY_WIDGET_LISTENER(operator_widget_battery_circles_connection, struct connection_update_state,
                             battery_circles_connection_update_cb, battery_circles_get_connection_state);
 ZMK_SUBSCRIPTION(operator_widget_battery_circles_connection, zmk_split_central_status_changed);
+
+#endif
+
+#ifdef CONFIG_PROSPECTOR_TOUCH_UI
+static struct prospector_peripheral_snapshot peripheral_get_state(const zmk_event_t *event) {
+    ARG_UNUSED(event);
+    struct prospector_peripheral_snapshot state;
+    prospector_peripheral_snapshot_get(&state);
+    return state; /* Also hydrate late-created layouts; never reset on NULL. */
+}
+static void peripheral_update_cb(struct prospector_peripheral_snapshot state) {
+    for (int i = 0; i < ZMK_SPLIT_BLE_PERIPHERAL_COUNT; i++) {
+        battery_circles_battery_update_cb((struct battery_update_state){.source = i, .level = state.battery[i]});
+        battery_circles_connection_update_cb((struct connection_update_state){.source = i, .connected = state.connected[i]});
+    }
+}
+ZMK_DISPLAY_WIDGET_LISTENER(operator_widget_battery_circles_snapshot, struct prospector_peripheral_snapshot,
+                            peripheral_update_cb, peripheral_get_state);
+ZMK_SUBSCRIPTION(operator_widget_battery_circles_snapshot, zmk_peripheral_battery_state_changed);
+ZMK_SUBSCRIPTION(operator_widget_battery_circles_snapshot, zmk_split_central_status_changed);
+#endif
 
 int zmk_widget_battery_circles_init(struct zmk_widget_battery_circles *widget, lv_obj_t *parent) {
     init_styles();
@@ -528,11 +557,14 @@ int zmk_widget_battery_circles_init(struct zmk_widget_battery_circles *widget, l
         }
     }
 
-    operator_widget_battery_circles_battery_init();
-    operator_widget_battery_circles_connection_init();
-
     widget->initialized = true;
     sys_slist_append(&widgets, &widget->node);
+#ifdef CONFIG_PROSPECTOR_TOUCH_UI
+    operator_widget_battery_circles_snapshot_init();
+#else
+    operator_widget_battery_circles_battery_init();
+    operator_widget_battery_circles_connection_init();
+#endif
 
     return 0;
 }

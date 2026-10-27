@@ -31,3 +31,7 @@ if(CONFIG_PROSPECTOR_INPUT_MODES)
     src/behaviors/behavior_shortcut.c)
   zephyr_link_libraries(-Wl,--wrap=raise_zmk_position_state_changed)
 endif()
+
+if(CONFIG_PROSPECTOR_TOUCH_UI)
+  zephyr_library_sources(src/peripheral_state.c)
+endif()

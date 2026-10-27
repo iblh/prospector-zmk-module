@@ -104,3 +104,7 @@ static inline uint32_t k_uptime_get_32(void) { return lv_tick_get(); }
 #define K_SECONDS(x) ((x)*1000)
 static inline uint32_t k_cycle_get_32(void) { return lv_tick_get() * 1000; }
 static inline uint32_t k_cyc_to_us_floor32(uint32_t t) { return t; }
+
+#ifndef ARG_UNUSED
+#define ARG_UNUSED(x) (void)(x)
+#endif

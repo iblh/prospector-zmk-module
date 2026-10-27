@@ -6,6 +6,7 @@
 
 #include <zephyr/types.h>
 #include <zephyr/init.h>
+#include <zephyr/sys/atomic.h>
 
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
@@ -32,6 +33,13 @@ struct psptr_peripheral_slot {
 };
 
 static struct psptr_peripheral_slot peripherals[ZMK_SPLIT_BLE_PERIPHERAL_COUNT];
+
+/* Readable independently of display initialization and layout creation. */
+static atomic_t connected_slots;
+bool prospector_split_peripheral_connected(uint8_t slot) {
+    return slot < ZMK_SPLIT_BLE_PERIPHERAL_COUNT && atomic_test_bit(&connected_slots, slot);
+}
+
 
 static int psptr_peripheral_slot_index_for_conn(struct bt_conn *conn) {
     for (int i = 0; i < ZMK_SPLIT_BLE_PERIPHERAL_COUNT; i++) {
@@ -123,8 +131,11 @@ static void split_central_process_connection(struct bt_conn *conn) {
     LOG_DBG("New connection params: Interval: %d, Latency: %d, PHY: %d", info.le.interval,
             info.le.latency, info.le.phy->rx_phy);
 
+    int index = psptr_peripheral_slot_index_for_conn(conn);
+    if (index < 0) { return; }
+    atomic_set_bit(&connected_slots, index);
     raise_zmk_split_central_status_changed((struct zmk_split_central_status_changed){
-        .slot = psptr_peripheral_slot_index_for_conn(conn),
+        .slot = index,
         .connected = true,
     });
 }
@@ -167,8 +178,11 @@ static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {
 
     LOG_DBG("Disconnected: %s (reason %d)", addr_str, reason);
 
+    int index = psptr_peripheral_slot_index_for_conn(conn);
+    if (index < 0) { return; } /* Ignore unrelated/already released connections. */
+    atomic_clear_bit(&connected_slots, index);
     raise_zmk_split_central_status_changed((struct zmk_split_central_status_changed){
-        .slot = psptr_peripheral_slot_index_for_conn(conn),
+        .slot = index,
         .connected = false,
     });
 

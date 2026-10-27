@@ -1,3 +1,12 @@
+config PROSPECTOR_LEFT_PERIPHERAL_SLOT
+    int "Bonded BLE slot displayed as the left half (two-peripheral Touch UI)"
+    range 0 1
+    default 0
+    depends on PROSPECTOR_TOUCH_UI
+    help
+      Bond slots follow pairing history, not physical handedness. This affects
+      display order only. It never changes key positions or BLE bonding data.
+
 config PROSPECTOR_INPUT_MODES
     bool "MAC-DV, WIN-DV and GAME input modes"
     depends on PROSPECTOR_TOUCH_UI && ZMK_SPLIT_ROLE_CENTRAL && ZMK_POINTING

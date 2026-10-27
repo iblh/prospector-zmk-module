@@ -33,6 +33,8 @@ add_executable(operator_renderer
   src/host_touch_brightness.c
   src/host_device_service.c
   src/device_screen_tests.c
+  src/host_peripheral_state.c
+  ${PROSPECTOR_ROOT}/src/peripheral_state.c
   ${PROSPECTOR_ROOT}/boards/shields/prospector_adapter/src/device_screen.c
   ${PROSPECTOR_ROOT}/boards/shields/prospector_adapter/src/layouts/operator/status_screen.c
   ${PROSPECTOR_ROOT}/boards/shields/prospector_adapter/src/touch_settings.c
@@ -52,6 +54,9 @@ add_executable(operator_renderer
 target_compile_definitions(operator_renderer PRIVATE
   CONFIG_PROSPECTOR_STATUS_SCREEN_OPERATOR=1
   CONFIG_PROSPECTOR_TOUCH_UI=1
+  ZMK_SPLIT_BLE_PERIPHERAL_COUNT=${OPERATOR_PERIPHERAL_COUNT}
+  CONFIG_PROSPECTOR_LEFT_PERIPHERAL_SLOT=1
+  CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING=1
   CONFIG_PROSPECTOR_LAYER_NAME_UPPERCASE=1
   CONFIG_DT_HAS_ZMK_BEHAVIOR_CAPS_WORD_ENABLED=1
   PROSPECTOR_RENDER_INSTANT_BATTERY=1
@@ -77,9 +82,10 @@ endif()
 
 option(PROSPECTOR_HOST_ALL_LAYOUTS "Create Classic and Field as well" OFF)
 if(PROSPECTOR_HOST_ALL_LAYOUTS)
+  target_sources(operator_renderer PRIVATE src/peripheral_screen_tests.c)
   target_compile_definitions(operator_renderer PRIVATE PROSPECTOR_HOST_ALL_LAYOUTS=1
     CONFIG_PROSPECTOR_SHOW_MODIFIERS=1 CONFIG_PROSPECTOR_SHOW_INACTIVE_MODIFIERS=1
-    ZMK_SPLIT_BLE_PERIPHERAL_COUNT=2 CONFIG_PROSPECTOR_ANIMATION_WPM_REFERENCE=80
+    CONFIG_PROSPECTOR_ANIMATION_WPM_REFERENCE=80
     CONFIG_PROSPECTOR_ANIMATION_INTENSITY_DECAY_SEC=30 CONFIG_PROSPECTOR_ANIMATION_FLOW_DECAY_SEC=300)
   target_include_directories(operator_renderer PRIVATE ${LVGL_DIR}/../../../../zmk/app/include)
   foreach(layout classic field)

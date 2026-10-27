@@ -10,6 +10,11 @@ lv_obj_t *zmk_display_status_screen(void);
 int operator_widget_modifier_indicator_cb(const zmk_event_t *eh);
 static uint32_t ticks;
 void host_device_screen_tests(void);
+void host_peripheral_set(uint8_t slot, bool connected, uint8_t level);
+void host_peripheral_publish(void);
+#ifdef PROSPECTOR_HOST_ALL_LAYOUTS
+void host_peripheral_screen_tests(void);
+#endif
 
 void host_advance_time(uint32_t ms) {
     for (uint32_t elapsed = 0; elapsed < ms; elapsed += 5) {
@@ -79,15 +84,13 @@ static void apply_batteries(const char *levels, const char *connected) {
          level_part = strtok_r(NULL, ",", &level_save)) {
         bool is_connected = conn_part ? parse_bool(conn_part) : true;
         int level = atoi(level_part);
-        battery_circles_connection_update_cb(
-            (struct connection_update_state){.source = (uint8_t)index, .connected = is_connected});
-        battery_circles_battery_update_cb(
-            (struct battery_update_state){.source = (uint8_t)index, .level = (uint8_t)level});
+        host_peripheral_set(index, is_connected, level);
         if (conn_part) {
             conn_part = strtok_r(NULL, ",", &conn_save);
         }
         index++;
     }
+    host_peripheral_publish();
 }
 
 static const char *arg_value(int *index, int argc, char **argv) {
@@ -117,6 +120,7 @@ int main(int argc, char **argv) {
     const char *layout = "operator";
     int input_mode = 0;
     bool device_tests = false;
+    bool peripheral_tests = false;
     enum zmk_transport transport = ZMK_TRANSPORT_USB;
 
     for (int i = 1; i < argc; i++) {
@@ -155,6 +159,8 @@ int main(int argc, char **argv) {
             layout = arg_value(&i, argc, argv);
         } else if (strcmp(argv[i], "--input-mode") == 0) {
             input_mode = atoi(arg_value(&i, argc, argv));
+        } else if (strcmp(argv[i], "--peripheral-tests") == 0) {
+            peripheral_tests = true;
         } else if (strcmp(argv[i], "--device-tests") == 0) {
             device_tests = true;
         }
@@ -177,6 +183,9 @@ int main(int argc, char **argv) {
 #ifdef CONFIG_PROSPECTOR_INPUT_MODES
     extern int host_mode;
     host_mode = input_mode;
+#endif
+#ifdef PROSPECTOR_HOST_ALL_LAYOUTS
+    if (peripheral_tests) { host_peripheral_screen_tests(); return 0; }
 #endif
     lv_obj_t *screen = zmk_display_status_screen();
 #ifdef PROSPECTOR_HOST_ALL_LAYOUTS

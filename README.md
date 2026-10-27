@@ -309,3 +309,21 @@ LVGL host also supports `PROSPECTOR_HOST_INPUT_MODES=ON` and
 The local build is a candidate: keyboard-half flashing, BLE pairing, HID shortcuts,
 GAME and trackball behavior require physical acceptance. Full workspace keymap,
 reproduction and pairing guide: [input-mode guide](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/docs/11-input-modes-guide.md).
+
+### T5-02 peripheral status synchronization
+
+Touch layouts hydrate connection/battery widgets from a full shared peripheral
+snapshot, including on first visit after BLE has already connected. Display work
+coalescing retains both slots. The observer publishes atomic connection state
+before notifying widgets and ignores unrelated disconnects.
+
+`CONFIG_PROSPECTOR_LEFT_PERIPHERAL_SLOT` selects which bonded slot appears at the
+left of a two-half Touch display. Its default is 0; this project's hardware config
+uses 1 because the right half was paired into slot 0. This changes presentation
+only, while K1/K2 on the device page remain raw slot numbers. Re-pairing into a
+different slot order requires checking this setting again.
+
+`tools/test_peripheral_state.py` compiles the real observer/query against platform
+shims. The actual LVGL renderer's `--peripheral-tests` covers late Classic/Field
+creation, both-slot refreshes, physical display order, reconnect and 120 screen
+switches without simulated BLE reconnect. Hardware acceptance remains separate.

@@ -8,6 +8,9 @@
 #include <zmk/event_manager.h>
 
 #include <fonts.h>
+#ifdef CONFIG_PROSPECTOR_TOUCH_UI
+#include <prospector/peripheral_state.h>
+#endif
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
 
@@ -97,6 +100,7 @@ void battery_bar_battery_update_cb(struct battery_update_state state) {
     }
 }
 
+#ifndef CONFIG_PROSPECTOR_TOUCH_UI
 static struct battery_update_state battery_bar_get_battery_state(const zmk_event_t *eh) {
     if (eh == NULL) {
         return (struct battery_update_state){.source = 0, .level = 0};
@@ -113,6 +117,7 @@ static struct battery_update_state battery_bar_get_battery_state(const zmk_event
         .level = bat_ev->state_of_charge,
     };
 }
+#endif
 
 void battery_bar_connection_update_cb(struct connection_update_state state) {
     struct zmk_widget_battery_bar *widget;
@@ -121,6 +126,7 @@ void battery_bar_connection_update_cb(struct connection_update_state state) {
     }
 }
 
+#ifndef CONFIG_PROSPECTOR_TOUCH_UI
 static struct connection_update_state battery_bar_get_connection_state(const zmk_event_t *eh) {
     if (eh == NULL) {
         return (struct connection_update_state){.source = 0, .connected = false};
@@ -137,7 +143,9 @@ static struct connection_update_state battery_bar_get_connection_state(const zmk
         .connected = conn_ev->connected,
     };
 }
+#endif
 
+#ifndef CONFIG_PROSPECTOR_TOUCH_UI
 ZMK_DISPLAY_WIDGET_LISTENER(classic_widget_battery_bar_battery, struct battery_update_state,
                             battery_bar_battery_update_cb, battery_bar_get_battery_state);
 ZMK_SUBSCRIPTION(classic_widget_battery_bar_battery, zmk_peripheral_battery_state_changed);
@@ -145,6 +153,27 @@ ZMK_SUBSCRIPTION(classic_widget_battery_bar_battery, zmk_peripheral_battery_stat
 ZMK_DISPLAY_WIDGET_LISTENER(classic_widget_battery_bar_connection, struct connection_update_state,
                             battery_bar_connection_update_cb, battery_bar_get_connection_state);
 ZMK_SUBSCRIPTION(classic_widget_battery_bar_connection, zmk_split_central_status_changed);
+
+#endif
+
+#ifdef CONFIG_PROSPECTOR_TOUCH_UI
+static struct prospector_peripheral_snapshot peripheral_get_state(const zmk_event_t *event) {
+    ARG_UNUSED(event);
+    struct prospector_peripheral_snapshot state;
+    prospector_peripheral_snapshot_get(&state);
+    return state; /* Also hydrate late-created layouts; never reset on NULL. */
+}
+static void peripheral_update_cb(struct prospector_peripheral_snapshot state) {
+    for (int i = 0; i < ZMK_SPLIT_BLE_PERIPHERAL_COUNT; i++) {
+        battery_bar_battery_update_cb((struct battery_update_state){.source = i, .level = state.battery[i]});
+        battery_bar_connection_update_cb((struct connection_update_state){.source = i, .connected = state.connected[i]});
+    }
+}
+ZMK_DISPLAY_WIDGET_LISTENER(classic_widget_battery_bar_snapshot, struct prospector_peripheral_snapshot,
+                            peripheral_update_cb, peripheral_get_state);
+ZMK_SUBSCRIPTION(classic_widget_battery_bar_snapshot, zmk_peripheral_battery_state_changed);
+ZMK_SUBSCRIPTION(classic_widget_battery_bar_snapshot, zmk_split_central_status_changed);
+#endif
 
 int zmk_widget_battery_bar_init(struct zmk_widget_battery_bar *widget, lv_obj_t *parent) {
     widget->obj = lv_obj_create(parent);
@@ -204,8 +233,12 @@ int zmk_widget_battery_bar_init(struct zmk_widget_battery_bar *widget, lv_obj_t 
 
     sys_slist_append(&widgets, &widget->node);
     widget->initialized = true;
+#ifdef CONFIG_PROSPECTOR_TOUCH_UI
+    classic_widget_battery_bar_snapshot_init();
+#else
     classic_widget_battery_bar_connection_init();
     classic_widget_battery_bar_battery_init();
+#endif
 
     return 0;
 }
