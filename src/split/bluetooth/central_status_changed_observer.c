@@ -205,4 +205,10 @@ static int zmk_split_bt_central_init(void) {
     return 0;
 }
 
+#if defined(CONFIG_PROSPECTOR_SPLIT_SCAN_POLICY)
+/* Keep the observer after the generated split central (51), and both after
+ * bt_enable/settings initialization (50), before main() loads settings. */
+SYS_INIT(zmk_split_bt_central_init, APPLICATION, 52);
+#else
 SYS_INIT(zmk_split_bt_central_init, APPLICATION, CONFIG_ZMK_BLE_INIT_PRIORITY);
+#endif

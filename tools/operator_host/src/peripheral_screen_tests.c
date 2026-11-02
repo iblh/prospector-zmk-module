@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <lvgl.h>
 #include <prospector/peripheral_state.h>
+#include <prospector_render_state.h>
+#include <zmk/event_manager.h>
+int operator_widget_wpm_meter_cb(const zmk_event_t *eh);
 void host_peripheral_set(uint8_t, bool, uint8_t);
 void host_peripheral_publish(void);
 void host_advance_time(uint32_t);
@@ -22,12 +25,23 @@ void host_peripheral_screen_tests(void) {
     assert(CONFIG_PROSPECTOR_LEFT_PERIPHERAL_SLOT == 1);
     lv_obj_t *operator = zmk_display_status_screen();
     lv_screen_load(operator);
+    /* WPM changes must advance through real LVGL timers, including while hidden.
+     * The old system-work callback bypassed this single-threaded lifecycle. */
+    host_state_set_wpm(60);
+    operator_widget_wpm_meter_cb(NULL);
+    host_advance_time(2000);
+    assert_text(operator,"60");
     host_peripheral_set(0,true,87);host_peripheral_set(1,true,42);
     host_peripheral_publish();host_advance_time(500);
     assert_text(operator,"42");assert_text(operator,"87");
     // These factories are first visited AFTER both BLE connection events.
     lv_obj_t *classic = prospector_screen_classic();
     lv_obj_t *field = prospector_screen_field();
+    lv_screen_load(field);
+    host_state_set_wpm(0);
+    operator_widget_wpm_meter_cb(NULL);
+    host_advance_time(6000);
+    assert_text(operator,"0");
     host_advance_time(500);
     assert_text(classic,"42");assert_text(classic,"87");assert_text(field,"42/87");
     // Verify the rendered positions, not just a swapped array in a helper test.

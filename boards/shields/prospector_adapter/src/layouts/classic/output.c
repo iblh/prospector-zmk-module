@@ -56,7 +56,7 @@ static void set_output_visible(bool visible) {
 static void profile_display_timeout_handler(struct k_work *work) {
     if (active_transport != ZMK_TRANSPORT_BLE) {
         set_output_visible(false);
-        k_work_reschedule(&battery_bar_uncompact_work, BATTERY_BAR_DELAY);
+        k_work_reschedule_for_queue(zmk_display_work_q(), &battery_bar_uncompact_work, BATTERY_BAR_DELAY);
     }
 }
 
@@ -139,11 +139,12 @@ static void profile_refresh_handler(struct k_work *work) {
     set_output_visible(true);
 }
 
-static int endpoint_changed_listener(const zmk_event_t *eh) {
-    const struct zmk_endpoint_changed *event = as_zmk_endpoint_changed(eh);
-    if (event) {
-        struct zmk_endpoint_instance selected = zmk_endpoint_get_selected();
-        active_transport = selected.transport;
+static enum zmk_transport endpoint_get_state(const zmk_event_t *eh) {
+    return zmk_endpoint_get_selected().transport;
+}
+static void endpoint_update(enum zmk_transport transport) {
+    {
+        active_transport = transport;
 
         k_work_cancel_delayable(&profile_refresh_work);
 
@@ -151,14 +152,14 @@ static int endpoint_changed_listener(const zmk_event_t *eh) {
             k_work_cancel_delayable(&profile_display_timeout_work);
             if (!output_visible) {
                 zmk_widget_battery_bar_set_compact(true);
-                k_work_reschedule(&output_fade_in_work, BATTERY_BAR_DELAY);
+                k_work_reschedule_for_queue(zmk_display_work_q(), &output_fade_in_work, BATTERY_BAR_DELAY);
             }
         } else {
             if (!output_visible) {
                 zmk_widget_battery_bar_set_compact(true);
-                k_work_reschedule(&output_fade_in_work, BATTERY_BAR_DELAY);
+                k_work_reschedule_for_queue(zmk_display_work_q(), &output_fade_in_work, BATTERY_BAR_DELAY);
             }
-            k_work_reschedule(&profile_display_timeout_work, PROFILE_DISPLAY_TIMEOUT);
+            k_work_reschedule_for_queue(zmk_display_work_q(), &profile_display_timeout_work, PROFILE_DISPLAY_TIMEOUT);
         }
 
         struct zmk_widget_output *widget;
@@ -166,34 +167,36 @@ static int endpoint_changed_listener(const zmk_event_t *eh) {
             update_output_widget(widget, active_profile_index);
         }
     }
-    return ZMK_EV_EVENT_BUBBLE;
 }
 
-static int ble_active_profile_changed_listener(const zmk_event_t *eh) {
-    const struct zmk_ble_active_profile_changed *event = as_zmk_ble_active_profile_changed(eh);
-    if (event) {
-        active_profile_index = event->index;
+static uint8_t profile_get_state(const zmk_event_t *eh) {
+    return zmk_ble_active_profile_index();
+}
+static void profile_update(uint8_t index) {
+    {
+        active_profile_index = index;
 
         if (output_visible) {
             set_output_visible(false);
-            k_work_reschedule(&profile_refresh_work, FADE_DURATION);
+            k_work_reschedule_for_queue(zmk_display_work_q(), &profile_refresh_work, FADE_DURATION);
         } else {
             struct zmk_widget_output *widget;
             SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
                 update_output_widget(widget, active_profile_index);
             }
             zmk_widget_battery_bar_set_compact(true);
-            k_work_reschedule(&output_fade_in_work, BATTERY_BAR_DELAY);
+            k_work_reschedule_for_queue(zmk_display_work_q(), &output_fade_in_work, BATTERY_BAR_DELAY);
         }
-        k_work_reschedule(&profile_display_timeout_work, PROFILE_DISPLAY_TIMEOUT);
+        k_work_reschedule_for_queue(zmk_display_work_q(), &profile_display_timeout_work, PROFILE_DISPLAY_TIMEOUT);
     }
-    return ZMK_EV_EVENT_BUBBLE;
 }
 
-ZMK_LISTENER(classic_widget_output_endpoint, endpoint_changed_listener);
+ZMK_DISPLAY_WIDGET_LISTENER(classic_widget_output_endpoint, enum zmk_transport,
+                            endpoint_update, endpoint_get_state)
 ZMK_SUBSCRIPTION(classic_widget_output_endpoint, zmk_endpoint_changed);
 
-ZMK_LISTENER(classic_widget_output_profile, ble_active_profile_changed_listener);
+ZMK_DISPLAY_WIDGET_LISTENER(classic_widget_output_profile, uint8_t,
+                            profile_update, profile_get_state)
 ZMK_SUBSCRIPTION(classic_widget_output_profile, zmk_ble_active_profile_changed);
 
 int zmk_widget_output_init(struct zmk_widget_output *widget, lv_obj_t *parent) {

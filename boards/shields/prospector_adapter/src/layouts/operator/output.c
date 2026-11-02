@@ -71,37 +71,40 @@ static void update_output_widget(struct zmk_widget_output *widget) {
     }
 }
 
-static int endpoint_changed_listener(const zmk_event_t *eh) {
-    const struct zmk_endpoint_changed *event = as_zmk_endpoint_changed(eh);
-    if (event) {
-        struct zmk_endpoint_instance selected = zmk_endpoint_get_selected();
-        active_transport = selected.transport;
+static enum zmk_transport endpoint_get_state(const zmk_event_t *eh) {
+    return zmk_endpoint_get_selected().transport;
+}
+static void endpoint_update(enum zmk_transport transport) {
+    {
+        active_transport = transport;
 
         struct zmk_widget_output *widget;
         SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
             update_output_widget(widget);
         }
     }
-    return ZMK_EV_EVENT_BUBBLE;
 }
 
-static int ble_active_profile_changed_listener(const zmk_event_t *eh) {
-    const struct zmk_ble_active_profile_changed *event = as_zmk_ble_active_profile_changed(eh);
-    if (event) {
-        active_profile_index = event->index;
+static uint8_t profile_get_state(const zmk_event_t *eh) {
+    return zmk_ble_active_profile_index();
+}
+static void profile_update(uint8_t index) {
+    {
+        active_profile_index = index;
 
         struct zmk_widget_output *widget;
         SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
             update_output_widget(widget);
         }
     }
-    return ZMK_EV_EVENT_BUBBLE;
 }
 
-ZMK_LISTENER(operator_widget_output_endpoint, endpoint_changed_listener);
+ZMK_DISPLAY_WIDGET_LISTENER(operator_widget_output_endpoint, enum zmk_transport,
+                            endpoint_update, endpoint_get_state)
 ZMK_SUBSCRIPTION(operator_widget_output_endpoint, zmk_endpoint_changed);
 
-ZMK_LISTENER(operator_widget_output_profile, ble_active_profile_changed_listener);
+ZMK_DISPLAY_WIDGET_LISTENER(operator_widget_output_profile, uint8_t,
+                            profile_update, profile_get_state)
 ZMK_SUBSCRIPTION(operator_widget_output_profile, zmk_ble_active_profile_changed);
 
 static lv_obj_t *create_toggle_btn(lv_obj_t *parent, const char *text, int x) {

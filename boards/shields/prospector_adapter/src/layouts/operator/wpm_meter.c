@@ -16,7 +16,8 @@
 #include "display_colors.h"
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
-static struct k_work_delayable wpm_smooth_work;
+/* All animation and widget state belongs to the display/LVGL thread. */
+static lv_timer_t *wpm_smooth_timer;
 
 static float displayed_wpm = 0.0f;
 static float target_wpm = 0.0f;
@@ -70,7 +71,7 @@ static void wpm_meter_render(int active_bars) {
     }
 }
 
-static void wpm_smooth_work_handler(struct k_work *work) {
+static void wpm_smooth_timer_handler(lv_timer_t *timer) {
     float diff = target_wpm - displayed_wpm;
     bool at_target = (diff > -0.5f && diff < 0.5f);
 
@@ -110,14 +111,17 @@ static void wpm_smooth_work_handler(struct k_work *work) {
         wpm_meter_render(active_bars);
     }
 
-    if (!at_target || peak_position > active_bars) {
-        k_work_schedule(&wpm_smooth_work, K_MSEC(33));
+    if (at_target && peak_position <= active_bars) {
+        lv_timer_pause(timer);
     }
 }
 
 static void wpm_meter_update_cb(struct wpm_meter_state state) {
     target_wpm = (float)state.wpm;
-    k_work_schedule(&wpm_smooth_work, K_NO_WAIT);
+    if (wpm_smooth_timer) {
+        lv_timer_resume(wpm_smooth_timer);
+        lv_timer_ready(wpm_smooth_timer);
+    }
 }
 
 static struct wpm_meter_state wpm_meter_get_state(const zmk_event_t *eh) {
@@ -220,10 +224,13 @@ int zmk_widget_wpm_meter_init(struct zmk_widget_wpm_meter *widget, lv_obj_t *par
     lv_obj_align(widget->layer_label, LV_ALIGN_BOTTOM_RIGHT, 9, 7);
 
     sys_slist_append(&widgets, &widget->node);
+    /* Listener initialization can immediately request animation. */
+    if (!wpm_smooth_timer) {
+        wpm_smooth_timer = lv_timer_create(wpm_smooth_timer_handler, 33, NULL);
+        lv_timer_pause(wpm_smooth_timer);
+    }
     operator_widget_wpm_meter_init();
     operator_widget_wpm_meter_layer_init();
-
-    k_work_init_delayable(&wpm_smooth_work, wpm_smooth_work_handler);
 
     return 0;
 }

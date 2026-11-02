@@ -15,7 +15,9 @@ Radii remains available only to upstream compile-time builds. Touch supplies man
 Optional MAC-DV / WIN-DV / GAME input modes require the companion dedicated keymap.
 
 Touch mapping, PWM, idle/touch wake and T4-01 device/UF2 UI have user acceptance.
-T5-01 typing, BLE pairing, GAME and keyboard wake are pending physical verification.
+As of 2026-11-01, the user has verified T5-09B right-half auto-connect and power-cycle
+reconnect, with a substantial improvement in trackball control. Dual-half operation,
+full GAME/OS shortcut coverage, long sessions and keyboard wake still need acceptance.
 See the [project guide](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/docs/11-input-modes-guide.md)
 and [current acceptance record](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/docs/06-roadmap-and-acceptance.md).
 
@@ -327,3 +329,27 @@ different slot order requires checking this setting again.
 shims. The actual LVGL renderer's `--peripheral-tests` covers late Classic/Field
 creation, both-slot refreshes, physical display order, reconnect and 120 screen
 switches without simulated BLE reconnect. Hardware acceptance remains separate.
+
+### T5-09B split scanning and input reliability
+
+The companion Touch config enables `CONFIG_PROSPECTOR_SPLIT_SCAN_POLICY`: no
+connected halves use the original passive 30ms/60ms discovery; one half uses
+5ms/200ms background discovery; both halves or a pending connection stop scanning.
+Mode changes and bounded retries preserve missing-half discovery and reconnection.
+The policy never toggles scanning for each input report.
+
+Module CMake generates a private copy of the pinned ZMK central translation unit;
+it does not edit the West checkout. A full source hash rejects unsupported versions.
+BLE/settings initialization must precede central registration: priorities 50/51/52
+order BLE, central and the Prospector observer. The companion local and CI builds
+run `tools/verify_scan_startup.py` against actual ELF init pointers. The original
+T5-09 equal-priority version had a connection regression and is superseded.
+
+Output widget events are dispatched to the display queue, and Operator WPM
+animation runs on an LVGL timer. Input/HID callbacks do not mutate these widgets.
+Optional pipeline, ATT/HCI and scan-AB instrumentation is disabled in the normal
+Dongle build; it remains available for reproducible diagnostics.
+
+Native policy and startup tests: `tools/test_scan_policy.py` and
+`tools/test_scan_startup.py` (C compiler and sibling pinned ZMK checkout required).
+See the companion [current baseline and optimization backlog](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/docs/27-current-baseline-and-next-steps.md).

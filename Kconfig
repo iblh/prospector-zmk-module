@@ -1,3 +1,46 @@
+config PROSPECTOR_PIPELINE_PROFILE
+    bool "Temporary aggregate split and USB pipeline diagnostics"
+    depends on LOG && BT && ZMK_SPLIT
+    default n
+    help
+      Requires the pinned ZMK instrumentation staged by the firmware build script.
+      Logs counts and maximum durations every two seconds, never typed contents.
+
+config PROSPECTOR_PIPELINE_CADENCE
+    bool "Measure pointing input and transport submission intervals"
+    depends on PROSPECTOR_PIPELINE_PROFILE
+    default n
+    help
+      Aggregate interval histograms only; does not change input/report scheduling.
+
+config PROSPECTOR_BLE_TX_TRACE
+    bool "Measure peripheral ATT allocation and local completion"
+    depends on PROSPECTOR_PIPELINE_CADENCE && !ZMK_SPLIT_ROLE_CENTRAL
+    default n
+    help
+      Pinned host ABI only. Linker wrappers time PDU allocation and ATT send;
+      GATT completion callbacks use bounded static storage. No packet logging.
+
+config PROSPECTOR_HCI_TRACE
+    bool "Pinned controller HCI submission/completion diagnostic"
+    depends on PROSPECTOR_BLE_TX_TRACE
+    default n
+
+config PROSPECTOR_SCAN_AB
+    bool "USB-commanded 80-second central scan ABBA diagnostic"
+    depends on PROSPECTOR_PIPELINE_CADENCE && ZMK_SPLIT_ROLE_CENTRAL && UART_CONSOLE
+    default n
+
+config PROSPECTOR_SPLIT_SCAN_POLICY
+    bool "Connection-aware split keyboard scanning"
+    depends on ZMK_SPLIT_ROLE_CENTRAL && ZMK_SPLIT_BLE
+    select ZMK_LOW_PRIORITY_WORK_QUEUE
+    default n
+    help
+      Fast discovery with no connected halves, 5ms/200ms background discovery
+      with a half online, and no scanning once all slots are occupied.
+      Requires the pinned ZMK central source supported by the module generator.
+
 config PROSPECTOR_LEFT_PERIPHERAL_SLOT
     int "Bonded BLE slot displayed as the left half (two-peripheral Touch UI)"
     range 0 1
