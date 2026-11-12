@@ -49,11 +49,19 @@ enum {USB_DC_DISCONNECTED,USB_DC_SUSPEND,USB_DC_CONFIGURED};
 int zmk_usb_get_status(void);
 bool zmk_usb_is_hid_ready(void);
 bool zmk_usb_is_powered(void);
+enum zmk_studio_core_lock_state {ZMK_STUDIO_CORE_LOCK_STATE_LOCKED, ZMK_STUDIO_CORE_LOCK_STATE_UNLOCKED};
+enum zmk_studio_core_lock_state zmk_studio_core_get_lock_state(void);
+void zmk_studio_core_lock(void);
+void zmk_studio_core_unlock(void);
 #define CONFIG_PROSPECTOR_RELEASE_TAG "TEST"
 #define CONFIG_PROSPECTOR_KEYMAP_LABEL "QWERTY"
 '''
 test = r'''
 static int test_mode;
+static enum zmk_studio_core_lock_state studio_state;
+enum zmk_studio_core_lock_state zmk_studio_core_get_lock_state(void) {return studio_state;}
+void zmk_studio_core_lock(void) {studio_state=ZMK_STUDIO_CORE_LOCK_STATE_LOCKED;}
+void zmk_studio_core_unlock(void) {studio_state=ZMK_STUDIO_CORE_LOCK_STATE_UNLOCKED;}
 static const char *mode_names[] = {"MAC-DV", "WIN-DV", "GAME"};
 int prospector_input_mode_get(void) { return test_mode; }
 const char *prospector_input_mode_name(int mode) { return mode_names[mode]; }
@@ -115,7 +123,19 @@ int main(void) {
 #else
     assert(!strcmp(info.keymap,"QWERTY"));
 #endif
-    puts("PASS device service: deferred reboot, bootmode failure, cancellation, idle, schedule errors, USB and slot state");
+#ifdef CONFIG_ZMK_STUDIO_RPC
+    assert(!prospector_device_studio_unlocked());
+    ready=false;assert(prospector_device_toggle_studio_lock()==-ENOTCONN);
+    assert(!prospector_device_studio_unlocked());
+    ready=true;assert(prospector_device_toggle_studio_lock()==0);
+    assert(prospector_device_studio_unlocked());
+    assert(prospector_device_toggle_studio_lock()==0);
+    assert(!prospector_device_studio_unlocked());
+#else
+    assert(!prospector_device_studio_unlocked());
+    assert(prospector_device_toggle_studio_lock()==-ENOTSUP);
+#endif
+    puts("PASS device service: deferred reboot, failures, idle, USB/slot state, optional USB-only Studio lock");
 }
 '''
 with tempfile.TemporaryDirectory() as tmp:
@@ -123,14 +143,15 @@ with tempfile.TemporaryDirectory() as tmp:
     (path / 'platform.h').write_text(platform)
     for name in ['zephyr/kernel.h', 'zephyr/retention/bootmode.h', 'zephyr/sys/atomic.h',
                  'zephyr/sys/reboot.h', 'zmk/activity.h', 'zmk/display.h', 'zmk/event_manager.h',
-                 'zmk/events/activity_state_changed.h', 'zmk/events/split_central_status_changed.h', 'zmk/usb.h']:
+                 'zmk/events/activity_state_changed.h', 'zmk/events/split_central_status_changed.h', 'zmk/usb.h', 'zmk/studio/core.h']:
         header = path / name
         header.parent.mkdir(parents=True, exist_ok=True)
         header.write_text('#include "platform.h"\n')
     (path / 'prospector_build_info.h').write_text('#define PROSPECTOR_BUILD_TIME "TEST"\n#define PROSPECTOR_SOURCE_ID "TEST"\n')
     source = root / 'boards/shields/prospector_adapter/src/device_service.c'
     (path / 'test.c').write_text(f'#include "{source}"\n' + test)
-    for flags in [[], ['-DCONFIG_PROSPECTOR_INPUT_MODES=1']]:
+    for flags in [[], ['-DCONFIG_PROSPECTOR_INPUT_MODES=1'], ['-DCONFIG_ZMK_STUDIO_RPC=1'],
+                  ['-DCONFIG_PROSPECTOR_INPUT_MODES=1', '-DCONFIG_ZMK_STUDIO_RPC=1']]:
         subprocess.run(['cc', *flags, '-I', str(path), '-I', str(root / 'include'),
                         str(path / 'test.c'), '-o', str(path / 'test')], check=True)
         subprocess.run([str(path / 'test')], check=True)

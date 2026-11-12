@@ -15,9 +15,16 @@ Radii remains available only to upstream compile-time builds. Touch supplies man
 Optional MAC-DV / WIN-DV / GAME input modes require the companion dedicated keymap.
 
 Touch mapping, PWM, idle/touch wake and T4-01 device/UF2 UI have user acceptance.
-As of 2026-11-01, the user has verified T5-09B right-half auto-connect and power-cycle
-reconnect, with a substantial improvement in trackball control. Dual-half operation,
-full GAME/OS shortcut coverage, long sessions and keyboard wake still need acceptance.
+As of 2026-11-12, the user reports the T5-12 USB control-page image boots and
+both halves connect after a second, scoped left-controller replacement. Shared
+brightness controls passed a 32-bit 64KB LVGL heap regression (36,448-byte reported
+peak), 120 reopen cycles and 120 layout switches locally. USB-only Studio access
+has explicit touchscreen unlock/lock. Browser RPC, full shortcut coverage, long
+sessions and this variant's sleep/wake still have separate acceptance checks.
+The right half remains at 800 CPI / ATT3 / 8ms with its existing diagnostic image.
+A v0.1.0-rc1 package freezes the existing binaries; it is not a claim of full stable
+release acceptance. Old-left recovery is opt-in maintenance only, never a normal
+boot action; the second authorized replacement uses a separate one-time record.
 See the [project guide](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/docs/11-input-modes-guide.md)
 and [current acceptance record](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/docs/06-roadmap-and-acceptance.md).
 

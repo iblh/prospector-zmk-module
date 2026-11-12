@@ -5,6 +5,7 @@
 #include <string.h>
 #include <lvgl.h>
 #include <prospector/device_screen.h>
+#include <prospector/brightness.h>
 
 extern int host_flash_requests, host_flash_request_error, host_flash_async_error;
 extern const char *host_usb_state;
@@ -51,6 +52,22 @@ static void open_info(void) {
     lv_obj_update_layout(lv_layer_top());
     host_advance_time(40);
     assert(visible_text(lv_layer_top(), "DEVICE"));
+}
+
+static lv_obj_t *find_slider(lv_obj_t *obj) {
+    if (lv_obj_check_type(obj, &lv_slider_class)) { return obj; }
+    for (uint32_t i = 0; i < lv_obj_get_child_count(obj); i++) {
+        lv_obj_t *found = find_slider(lv_obj_get_child(obj, i));
+        if (found) { return found; }
+    }
+    return NULL;
+}
+static unsigned int slider_count(lv_obj_t *obj) {
+    unsigned int count = lv_obj_check_type(obj, &lv_slider_class) ? 1 : 0;
+    for (uint32_t i = 0; i < lv_obj_get_child_count(obj); i++) {
+        count += slider_count(lv_obj_get_child(obj, i));
+    }
+    return count;
 }
 
 static void confirm_page(void) {
@@ -151,7 +168,7 @@ void host_device_screen_tests(void) {
 #ifdef CONFIG_PROSPECTOR_INPUT_MODES
     extern int host_mode, host_mode_pending, host_mode_requests, host_mode_error;
     open_info();
-    tap(130, 136);
+    tap(130, 110);
     assert(visible_text(lv_layer_top(), "INPUT MODE"));
     assert(visible_text(lv_layer_top(), "ACTIVE: MAC-DV"));
     tap(135, 92); // WIN-DV
@@ -164,12 +181,65 @@ void host_device_screen_tests(void) {
     host_mode = 2; host_mode_pending = -1; host_advance_time(40);
     assert(visible_text(lv_layer_top(), "ACTIVE: GAME"));
     tap(140, 209); assert(visible_text(lv_layer_top(), "DEVICE"));
-    tap(130, 136); host_mode_error = -12;
+    tap(130, 110); host_mode_error = -12;
     tap(135, 52); assert(visible_text(lv_layer_top(), "MODE FAILED (-12)"));
     host_mode_error = 0;
     prospector_device_screen_on_idle(); assert(!prospector_device_screen_is_open());
     puts("PASS mode UI: entry, all selectors, pending-to-active, BACK, errors and idle close");
 #endif
+#ifdef CONFIG_ZMK_STUDIO_RPC
+    extern bool host_studio_unlocked;
+    extern int host_studio_toggles, host_studio_error;
+    open_info();
+    assert(visible_text(lv_layer_top(), "USB EDITOR   /   UNLOCK"));
+    tap(140, 170);
+    assert(host_studio_unlocked && host_studio_toggles == 1);
+    assert(visible_text(lv_layer_top(), "USB EDITOR   /   LOCK"));
+    host_studio_unlocked = false; host_advance_time(600);
+    assert(visible_text(lv_layer_top(), "USB EDITOR   /   UNLOCK"));
+    host_studio_error = -ENOTCONN; tap(140, 170);
+    assert(!host_studio_unlocked);
+    assert(visible_text(lv_layer_top(), "CONNECT USB TO UNLOCK"));
+    host_studio_error = 0; tap(140, 170);
+    assert(host_studio_unlocked);
+    tap(140, 170); assert(!host_studio_unlocked);
+    prospector_device_screen_on_idle();
+    puts("PASS USB editor UI: deliberate unlock/lock, external relock and no-host error");
+#endif
+    lv_obj_t *slider = find_slider(lv_layer_top());
+    assert(slider);
+    assert(slider_count(lv_layer_top()) == 1);
+    lv_obj_t *brightness_panel = lv_obj_get_parent(slider);
+    lv_obj_remove_flag(brightness_panel, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_update_layout(lv_layer_top());
+    lv_slider_set_value(slider, 10, LV_ANIM_OFF);
+    lv_obj_send_event(slider, LV_EVENT_VALUE_CHANGED, NULL);
+    assert(prospector_brightness_get_manual() == 10);
+    lv_slider_set_value(slider, 100, LV_ANIM_OFF);
+    lv_obj_send_event(slider, LV_EVENT_VALUE_CHANGED, NULL);
+    assert(prospector_brightness_get_manual() == 100);
+    extern int host_layout_cycles;
+    int before_cycles = host_layout_cycles;
+    touch(170, 130, true); touch(30, 130, true); touch(30, 130, false);
+    assert(prospector_brightness_get_manual() >= 10 && prospector_brightness_get_manual() < 100);
+    assert(host_layout_cycles == before_cycles);
+    tap(140, 213);
+    assert(lv_obj_has_flag(brightness_panel, LV_OBJ_FLAG_HIDDEN));
+    puts("PASS brightness UI: 10/100 bounds, actual pointer drag, no layout gesture leak, CLOSE");
+    lv_mem_monitor_t before, after;
+    lv_mem_monitor(&before);
+    for (int i = 0; i < 120; i++) {
+        open_info();
+        tap(60, 209);
+        lv_obj_remove_flag(brightness_panel, LV_OBJ_FLAG_HIDDEN);
+        host_advance_time(40);
+        tap(140, 213);
+    }
+    lv_mem_monitor(&after);
+    assert(after.free_size >= before.free_size);
+    assert(slider_count(lv_layer_top()) == 1);
+    if (sizeof(void *) == 4) { assert(after.free_biggest_size >= 8192); }
+    puts("PASS controls lifecycle: 120 reopen/close cycles, one shared slider, no retained heap growth");
     lv_indev_delete(pointer);
     puts("PASS device UI: independent contacts, short/early release, slide-out, cancel, timeout, idle, one-shot request and errors");
 }

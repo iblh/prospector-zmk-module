@@ -7,7 +7,10 @@
 #define LV_USE_LOG 0
 #define LV_USE_ASSERT_NULL 1
 #define LV_USE_ASSERT_MALLOC 1
+#define LV_ASSERT_HANDLER __builtin_trap();
+#ifndef LV_MEM_SIZE
 #define LV_MEM_SIZE (1024 * 1024)
+#endif
 #define LV_DRAW_BUF_STRIDE_ALIGN 4
 #define LV_DRAW_BUF_ALIGN 4
 
@@ -44,7 +47,7 @@
 #define LV_USE_FFMPEG 0
 #define LV_USE_SVG 0
 
-#define LV_FONT_MONTSERRAT_14 1
-#define LV_FONT_DEFAULT &lv_font_montserrat_14
+#define LV_FONT_MONTSERRAT_12 1
+#define LV_FONT_DEFAULT &lv_font_montserrat_12
 
 #endif

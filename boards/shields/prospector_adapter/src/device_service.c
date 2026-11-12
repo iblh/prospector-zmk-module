@@ -11,6 +11,9 @@
 #include <zmk/events/split_central_status_changed.h>
 #include <zmk/usb.h>
 #include <prospector/device_service.h>
+#ifdef CONFIG_ZMK_STUDIO_RPC
+#include <zmk/studio/core.h>
+#endif
 #ifdef CONFIG_PROSPECTOR_INPUT_MODES
 #include <prospector/input_mode.h>
 #endif
@@ -20,6 +23,25 @@
 static atomic_t connected_slots;
 static atomic_t flash_pending;
 static atomic_t flash_error;
+
+bool prospector_device_studio_unlocked(void) {
+#ifdef CONFIG_ZMK_STUDIO_RPC
+    return zmk_studio_core_get_lock_state() == ZMK_STUDIO_CORE_LOCK_STATE_UNLOCKED;
+#else
+    return false;
+#endif
+}
+
+int prospector_device_toggle_studio_lock(void) {
+#ifdef CONFIG_ZMK_STUDIO_RPC
+    if (!zmk_usb_is_hid_ready()) { return -ENOTCONN; }
+    if (prospector_device_studio_unlocked()) { zmk_studio_core_lock(); }
+    else { zmk_studio_core_unlock(); }
+    return 0;
+#else
+    return -ENOTSUP;
+#endif
+}
 
 void prospector_device_info_get(struct prospector_device_info *info) {
     const char *usb = "NO HOST";

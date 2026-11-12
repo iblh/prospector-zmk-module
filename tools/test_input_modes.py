@@ -22,7 +22,8 @@ for mode in ('mac', 'win'):
         assert len(masks) == 2 and masks[0] == masks[1]
         assert 'MOD_RCTL' in masks[0] and 'MOD_LCTL' in masks[0]
         assert ('MOD_RGUI' in masks[0]) == (mode == 'mac')
-assert re.findall(r'display-name = "(.*?)"',keymap) == ['MAC-DV','WIN-DV','GAME','NUM','NAV','SYM','FN','SLOW','SCROLL']
+layer_names = re.findall(r'display-name = "(.*?)";\s*bindings = <', keymap[keymap.index('keymap {'):])
+assert layer_names == ['MAC-DV','WIN-DV','GAME','NUM','NAV','SYM','FN','SLOW','SCROLL']
 for label,n in [('MAC',0),('WIN',1),('GAME',2),('NUM',3),('NAV',4),('SYM',5),('FN',6),('SLOW',7),('SCROLL',8)]:
     assert f'#define {label} {n}' in keymap
 for name in ('MAC-DV', 'WIN-DV', 'GAME', 'NUM', 'NAV', 'SYM', 'FN', 'SLOW', 'SCROLL'):

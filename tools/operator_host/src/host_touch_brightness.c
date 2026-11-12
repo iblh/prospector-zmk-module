@@ -3,7 +3,8 @@
 #include <prospector/brightness.h>
 #include <prospector/status_layout.h>
 
-void prospector_status_layout_cycle(int direction) { (void)direction; }
+int host_layout_cycles;
+void prospector_status_layout_cycle(int direction) { (void)direction; host_layout_cycles++; }
 
 static uint8_t brightness = 65;
 

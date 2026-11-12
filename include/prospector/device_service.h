@@ -15,3 +15,5 @@ void prospector_device_info_get(struct prospector_device_info *info);
 int prospector_device_request_bootloader(void);
 void prospector_device_cancel_bootloader(void);
 int prospector_device_bootloader_error(void);
+bool prospector_device_studio_unlocked(void);
+int prospector_device_toggle_studio_lock(void);

@@ -1,8 +1,13 @@
 /* SPDX-License-Identifier: MIT */
 #include <lvgl.h>
+#include <string.h>
 #include <fonts.h>
+#include <control_style.h>
 #include <prospector/device_screen.h>
 #include <prospector/device_service.h>
+#ifdef CONFIG_PROSPECTOR_LEFT_SLOT_RECOVERY
+#include <prospector/left_slot_recovery.h>
+#endif
 #ifdef CONFIG_PROSPECTOR_INPUT_MODES
 #include <prospector/input_mode.h>
 #endif
@@ -14,6 +19,17 @@ enum device_page { PAGE_INFO, PAGE_MODES, PAGE_CONFIRM, PAGE_PENDING };
 static enum device_page page;
 static lv_obj_t *root, *info_page, *confirm_page;
 static lv_obj_t *info_text, *hold_button, *hold_progress, *hold_hint;
+static lv_obj_t *build_text, *source_text, *usb_text, *slot_text[2];
+#ifndef CONFIG_PROSPECTOR_INPUT_MODES
+static lv_obj_t *keymap_text;
+#endif
+#ifdef CONFIG_PROSPECTOR_LEFT_SLOT_RECOVERY
+static lv_obj_t *maintenance_text;
+#endif
+#ifdef CONFIG_ZMK_STUDIO_RPC
+static lv_obj_t *studio_button, *studio_text;
+static int studio_error;
+#endif
 #ifdef CONFIG_PROSPECTOR_INPUT_MODES
 static int mode_error;
 static lv_obj_t *modes_page, *mode_label, *mode_hint, *mode_buttons[3];
@@ -24,8 +40,7 @@ static uint32_t hold_started, confirm_started, refreshed;
 static bool holding;
 
 static void style_text(lv_obj_t *label) {
-    lv_obj_set_style_text_font(label, &FG_Medium_20, 0);
-    lv_obj_set_style_text_color(label, lv_color_hex(0xF0F7FC), 0);
+    prospector_control_text(label);
 }
 
 static lv_obj_t *make_label(lv_obj_t *parent, const char *text, int y) {
@@ -51,12 +66,7 @@ static lv_obj_t *make_button(lv_obj_t *parent, const char *text, int x, int widt
     lv_obj_t *button = lv_button_create(parent);
     lv_obj_set_size(button, width, 38);
     lv_obj_set_pos(button, x, 190);
-    lv_obj_set_style_bg_color(button, lv_color_hex(0x299BE8), 0);
-    lv_obj_set_style_bg_color(button, lv_color_hex(0x1676BB), LV_STATE_PRESSED);
-    lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(button, 0, 0);
-    lv_obj_set_style_radius(button, 7, 0);
-    lv_obj_set_style_pad_all(button, 0, 0);
+    prospector_control_button(button);
     lv_obj_clear_flag(button, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_add_event_cb(button, callback, LV_EVENT_ALL, NULL);
     lv_obj_t *label = lv_label_create(button);
@@ -65,6 +75,21 @@ static lv_obj_t *make_button(lv_obj_t *parent, const char *text, int x, int widt
     lv_obj_center(label);
     return button;
 }
+
+#ifdef CONFIG_ZMK_STUDIO_RPC
+static void refresh_studio(void) {
+    bool unlocked = prospector_device_studio_unlocked();
+    lv_label_set_text(studio_text, studio_error < 0 ? "CONNECT USB TO UNLOCK" :
+                      unlocked ? "USB EDITOR   /   LOCK" : "USB EDITOR   /   UNLOCK");
+    lv_obj_set_style_border_color(studio_button,
+        lv_color_hex(unlocked ? PSP_CONTROL_ACCENT : PSP_CONTROL_LINE), 0);
+}
+static void studio_action(lv_event_t *event) {
+    if (lv_event_get_code(event) != LV_EVENT_CLICKED) { return; }
+    studio_error = prospector_device_toggle_studio_lock();
+    refresh_studio();
+}
+#endif
 
 static void reset_hold(void) {
     holding = false;
@@ -75,15 +100,27 @@ static void reset_hold(void) {
 static void refresh_info(void) {
     struct prospector_device_info info;
     prospector_device_info_get(&info);
-    lv_label_set_text_fmt(info_text,
-        "FW %s\nBUILD %s\nSRC %s\nKEYMAP %s\nUSB %s   K1 %s  K2 %s",
-        info.version, info.build_time, info.source_id, info.keymap, info.usb,
-        info.connected[0] ? "ON" : "--", info.connected[1] ? "ON" : "--");
+    lv_label_set_text(info_text, info.version);
+    lv_label_set_text_fmt(build_text, "BUILD  %s", info.build_time);
+    lv_label_set_text_fmt(source_text, "SRC %s", info.source_id);
+    lv_label_set_text_fmt(usb_text, "USB %s", info.usb);
+    lv_obj_set_style_text_color(usb_text, lv_color_hex(!strcmp(info.usb, "READY") ?
+        PSP_CONTROL_ACCENT : PSP_CONTROL_MUTED), 0);
+    for (int i = 0; i < 2; i++) {
+        lv_label_set_text_fmt(slot_text[i], "K%d %s", i + 1, info.connected[i] ? "ON" : "--");
+        lv_obj_set_style_text_color(slot_text[i], lv_color_hex(info.connected[i] ?
+            PSP_CONTROL_ACCENT : PSP_CONTROL_MUTED), 0);
+    }
 #ifdef CONFIG_PROSPECTOR_INPUT_MODES
-    lv_label_set_text_fmt(mode_label, "MODE %s   >", info.keymap);
-    lv_label_set_text_fmt(info_text, "FW %s\nBUILD %s\nSRC %s\n\nUSB %s   K1 %s  K2 %s",
-        info.version, info.build_time, info.source_id, info.usb,
-        info.connected[0] ? "ON" : "--", info.connected[1] ? "ON" : "--");
+    lv_label_set_text_fmt(mode_label, "%s  >", info.keymap);
+#else
+    lv_label_set_text_fmt(keymap_text, "KEYMAP %s", info.keymap);
+#endif
+#ifdef CONFIG_PROSPECTOR_LEFT_SLOT_RECOVERY
+    lv_label_set_text(maintenance_text, prospector_left_recovery_status());
+#endif
+#ifdef CONFIG_ZMK_STUDIO_RPC
+    refresh_studio();
 #endif
     refreshed = lv_tick_get();
 }
@@ -119,7 +156,9 @@ static void refresh_modes(void) {
     int pending = prospector_input_mode_pending();
     for (int i = 0; i < 3; i++) {
         lv_obj_set_style_bg_color(mode_buttons[i], lv_color_hex(
-            i == pending ? 0xA66A14 : i == current ? 0x168B75 : 0x29404B), 0);
+            i == pending ? 0x64491D : i == current ? 0x20434E : PSP_CONTROL_PANEL), 0);
+        lv_obj_set_style_border_color(mode_buttons[i], lv_color_hex(
+            i == pending ? 0xD7AC57 : i == current ? PSP_CONTROL_ACCENT : PSP_CONTROL_LINE), 0);
     }
     if (mode_error < 0) {
         lv_label_set_text_fmt(mode_hint, "MODE FAILED (%d)", mode_error);
@@ -247,22 +286,28 @@ static void update_page(lv_timer_t *unused) {
 
 static void create_page(void) {
     root = make_panel(lv_layer_top());
-    lv_obj_set_style_bg_color(root, lv_color_hex(0x121A1C), 0);
+    lv_obj_set_style_bg_color(root, lv_color_hex(PSP_CONTROL_BG), 0);
     lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
     info_page = make_panel(root);
-    make_label(info_page, "DEVICE", 8);
-    info_text = make_label(info_page, "", 42);
-    lv_obj_set_style_text_line_space(info_text, 4, 0);
-    lv_obj_set_style_text_letter_space(info_text, -1, 0);
+    lv_obj_t *title = make_label(info_page, "DEVICE", 10);
+    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_LEFT, 0);
+    info_text = make_label(info_page, "", 43);
+    lv_obj_set_width(info_text, 212);
+    lv_obj_align(info_text, LV_ALIGN_TOP_LEFT, 52, 43);
+    lv_obj_set_style_text_align(info_text, LV_TEXT_ALIGN_LEFT, 0);
     make_button(info_page, "CLOSE", 20, 106, close_page);
     make_button(info_page, "FLASH", 154, 106, open_confirmation);
 
 #ifdef CONFIG_PROSPECTOR_INPUT_MODES
     lv_obj_t *change = make_button(info_page, "", 16, 248, open_modes);
-    lv_obj_set_pos(change, 16, 124);
-    lv_obj_set_height(change, 27);
-    lv_obj_set_style_bg_opa(change, LV_OPA_TRANSP, 0);
+    lv_obj_set_pos(change, 16, 92);
+    lv_obj_set_height(change, 36);
     mode_label = lv_obj_get_child(change, 0);
+    lv_obj_align(mode_label, LV_ALIGN_RIGHT_MID, -10, 0);
+    lv_obj_t *mode_caption = lv_label_create(change);
+    prospector_control_small(mode_caption);
+    lv_label_set_text(mode_caption, "INPUT MODE");
+    lv_obj_align(mode_caption, LV_ALIGN_LEFT_MID, 10, 0);
     modes_page = make_panel(root);
     make_label(modes_page, "INPUT MODE", 8);
     for (int i = 0; i < 3; i++) {
@@ -275,6 +320,43 @@ static void create_page(void) {
     mode_hint = make_label(modes_page, "", 153);
     lv_obj_set_style_text_font(mode_hint, LV_FONT_DEFAULT, 0);
     make_button(modes_page, "BACK", 80, 120, cancel_confirmation);
+#else
+    keymap_text = make_label(info_page, "", 100);
+#endif
+    /* Keep CLOSE/FLASH/MODE child ordering stable for host previews. */
+    prospector_control_rule(info_page);
+    lv_obj_t *firmware_caption = lv_label_create(info_page);
+    prospector_control_small(firmware_caption);
+    lv_label_set_text(firmware_caption, "FW");
+    lv_obj_set_pos(firmware_caption, 16, 49);
+    build_text = lv_label_create(info_page);
+    prospector_control_small(build_text);
+    lv_obj_set_pos(build_text, 16, 71);
+    source_text = lv_label_create(info_page);
+    prospector_control_small(source_text);
+    lv_obj_set_width(source_text, 104);
+    lv_obj_set_style_text_align(source_text, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(source_text, 160, 17);
+    usb_text = lv_label_create(info_page);
+    prospector_control_small(usb_text);
+    lv_obj_set_pos(usb_text, 16, 140);
+    for (int i = 0; i < 2; i++) {
+        slot_text[i] = lv_label_create(info_page);
+        prospector_control_small(slot_text[i]);
+        lv_obj_set_pos(slot_text[i], 139 + i * 75, 140);
+    }
+#ifdef CONFIG_PROSPECTOR_LEFT_SLOT_RECOVERY
+    maintenance_text = make_label(info_page, "", 164);
+    prospector_control_small(maintenance_text);
+#endif
+#ifdef CONFIG_ZMK_STUDIO_RPC
+    studio_button = make_button(info_page, "", 16, 248, studio_action);
+    lv_obj_set_pos(studio_button, 16, 155);
+    lv_obj_set_height(studio_button, 29);
+    lv_obj_set_ext_click_area(studio_button, 4);
+    studio_text = lv_obj_get_child(studio_button, 0);
+    prospector_control_small(studio_text);
+    lv_obj_set_style_text_color(studio_text, lv_color_hex(PSP_CONTROL_ACCENT), 0);
 #endif
     confirm_page = make_panel(root);
     make_label(confirm_page, "ENTER UF2?", 8);
@@ -284,9 +366,9 @@ static void create_page(void) {
     lv_obj_set_size(hold_progress, 240, 8);
     lv_obj_align(hold_progress, LV_ALIGN_TOP_MID, 0, 158);
     lv_bar_set_range(hold_progress, 0, HOLD_MS);
-    lv_obj_set_style_bg_color(hold_progress, lv_color_hex(0x324653), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(hold_progress, lv_color_hex(PSP_CONTROL_LINE), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(hold_progress, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(hold_progress, lv_color_hex(0x299BE8), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(hold_progress, lv_color_hex(PSP_CONTROL_ACCENT), LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(hold_progress, LV_OPA_COVER, LV_PART_INDICATOR);
     make_button(confirm_page, "CANCEL", 20, 86, cancel_confirmation);
     hold_button = make_button(confirm_page, "HOLD 2S", 126, 134, hold_event);

@@ -10,26 +10,19 @@
 #include <prospector/touch_settings.h>
 #include <prospector/device_screen.h>
 #include <fonts.h>
+#include <control_style.h>
 
 /* The firmware intentionally has no LVGL theme. Every new control needs its
  * own visible styles; otherwise LVGL defaults to transparent/black on black. */
-#define TOUCH_ACCENT 0x299BE8
-#define TOUCH_ACCENT_PRESSED 0x1676BB
-#define TOUCH_TEXT 0xF0F7FC
+#define TOUCH_ACCENT PSP_CONTROL_ACCENT
+#define TOUCH_TEXT PSP_CONTROL_TEXT
 
 static void style_action_button(lv_obj_t *button) {
-    lv_obj_set_style_bg_color(button, lv_color_hex(TOUCH_ACCENT), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(button, lv_color_hex(TOUCH_ACCENT_PRESSED),
-                              LV_PART_MAIN | LV_STATE_PRESSED);
-    lv_obj_set_style_bg_opa(button, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(button, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(button, 7, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(button, 0, LV_PART_MAIN);
+    prospector_control_button(button);
 }
 
 static void style_action_label(lv_obj_t *label) {
-    lv_obj_set_style_text_color(label, lv_color_hex(TOUCH_TEXT), LV_PART_MAIN);
-    lv_obj_set_style_text_font(label, &FG_Medium_20, LV_PART_MAIN);
+    prospector_control_text(label);
 }
 
 struct touch_screen_controls {
@@ -37,13 +30,14 @@ struct touch_screen_controls {
     lv_obj_t *brightness_slider;
     lv_obj_t *brightness_label;
 };
-static struct touch_screen_controls controls[PROSPECTOR_LAYOUT_COUNT];
+/* One top-layer panel serves every layout; do not allocate three copies. */
+static struct touch_screen_controls shared_control;
 static unsigned int controls_count;
 
 static void refresh_brightness(struct touch_screen_controls *control) {
     uint8_t value = prospector_brightness_get_manual();
     lv_slider_set_value(control->brightness_slider, value, LV_ANIM_OFF);
-    lv_label_set_text_fmt(control->brightness_label, "BRIGHTNESS  %u%%", value);
+    lv_label_set_text_fmt(control->brightness_label, "%u%%", value);
 }
 
 static void open_settings(lv_event_t *event) {
@@ -61,7 +55,7 @@ static void close_settings(lv_event_t *event) {
 static void slider_changed(lv_event_t *event) {
     struct touch_screen_controls *control = lv_event_get_user_data(event);
     uint8_t value = (uint8_t)lv_slider_get_value(control->brightness_slider);
-    lv_label_set_text_fmt(control->brightness_label, "BRIGHTNESS  %u%%", value);
+    lv_label_set_text_fmt(control->brightness_label, "%u%%", value);
     (void)prospector_brightness_set_manual(value);
 }
 
@@ -111,15 +105,17 @@ void prospector_touch_settings_attach(lv_obj_t *screen) {
     if (controls_count >= PROSPECTOR_LAYOUT_COUNT) {
         return;
     }
-    struct touch_screen_controls *control = &controls[controls_count++];
+    struct touch_screen_controls *control = &shared_control;
+    controls_count++;
     make_status_children_passive(screen);
     lv_obj_add_flag(screen, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_event_cb(screen, screen_gesture, LV_EVENT_GESTURE, control);
-    lv_obj_t *settings_panel = control->settings_panel = lv_obj_create(screen);
+    if (control->settings_panel) { return; }
+    lv_obj_t *settings_panel = control->settings_panel = lv_obj_create(lv_layer_top());
     lv_obj_set_size(settings_panel, lv_pct(100), lv_pct(100));
     lv_obj_center(settings_panel);
-    lv_obj_set_style_bg_color(settings_panel, lv_color_hex(0x121A1C), 0);
+    lv_obj_set_style_bg_color(settings_panel, lv_color_hex(PSP_CONTROL_BG), 0);
     lv_obj_set_style_bg_opa(settings_panel, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(settings_panel, 0, LV_PART_MAIN);
     lv_obj_set_style_radius(settings_panel, 0, LV_PART_MAIN);
@@ -127,30 +123,46 @@ void prospector_touch_settings_attach(lv_obj_t *screen) {
     lv_obj_add_flag(settings_panel, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(settings_panel, LV_OBJ_FLAG_SCROLLABLE);
 
+    lv_obj_t *title = lv_label_create(settings_panel);
+    style_action_label(title);
+    lv_label_set_text(title, "BRIGHTNESS");
+    lv_obj_set_pos(title, 16, 10);
+    prospector_control_rule(settings_panel);
+
     lv_obj_t *brightness_label = control->brightness_label = lv_label_create(settings_panel);
-    lv_label_set_text_fmt(brightness_label, "BRIGHTNESS  %u%%",
+    lv_label_set_text_fmt(brightness_label, "%u%%",
                           prospector_brightness_get_manual());
     style_action_label(brightness_label);
-    lv_obj_align(brightness_label, LV_ALIGN_TOP_MID, 0, 28);
+    lv_obj_set_style_text_font(brightness_label, &FR_Medium_32, 0);
+    lv_obj_align(brightness_label, LV_ALIGN_TOP_MID, 0, 59);
 
     lv_obj_t *brightness_slider = control->brightness_slider = lv_slider_create(settings_panel);
-    lv_obj_set_width(brightness_slider, lv_pct(90));
-    lv_obj_set_height(brightness_slider, 18);
-    lv_obj_align(brightness_slider, LV_ALIGN_CENTER, 0, -12);
-    lv_obj_set_style_bg_color(brightness_slider, lv_color_hex(0x324653), LV_PART_MAIN);
+    lv_obj_set_size(brightness_slider, 232, 12);
+    lv_obj_set_pos(brightness_slider, 24, 124);
+    lv_obj_set_ext_click_area(brightness_slider, 16);
+    lv_obj_set_style_bg_color(brightness_slider, lv_color_hex(PSP_CONTROL_LINE), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(brightness_slider, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(brightness_slider, 9, LV_PART_MAIN);
+    lv_obj_set_style_radius(brightness_slider, 2, LV_PART_MAIN);
     lv_obj_set_style_bg_color(brightness_slider, lv_color_hex(TOUCH_ACCENT), LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(brightness_slider, LV_OPA_COVER, LV_PART_INDICATOR);
-    lv_obj_set_style_radius(brightness_slider, 9, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(brightness_slider, 2, LV_PART_INDICATOR);
     lv_obj_set_style_bg_color(brightness_slider, lv_color_hex(TOUCH_TEXT), LV_PART_KNOB);
     lv_obj_set_style_bg_opa(brightness_slider, LV_OPA_COVER, LV_PART_KNOB);
-    lv_obj_set_style_radius(brightness_slider, LV_RADIUS_CIRCLE, LV_PART_KNOB);
-    lv_obj_set_style_pad_all(brightness_slider, 6, LV_PART_KNOB);
+    lv_obj_set_style_radius(brightness_slider, 2, LV_PART_KNOB);
+    lv_obj_set_style_pad_hor(brightness_slider, 4, LV_PART_KNOB);
+    lv_obj_set_style_pad_ver(brightness_slider, 6, LV_PART_KNOB);
     lv_slider_set_range(brightness_slider, 10, 100);
     lv_slider_set_value(brightness_slider, prospector_brightness_get_manual(), LV_ANIM_OFF);
     lv_obj_add_event_cb(brightness_slider, slider_changed,
                         LV_EVENT_VALUE_CHANGED, control);
+    lv_obj_t *minimum = lv_label_create(settings_panel);
+    prospector_control_small(minimum);
+    lv_label_set_text(minimum, "10%");
+    lv_obj_set_pos(minimum, 20, 151);
+    lv_obj_t *maximum = lv_label_create(settings_panel);
+    prospector_control_small(maximum);
+    lv_label_set_text(maximum, "100%");
+    lv_obj_align(maximum, LV_ALIGN_TOP_RIGHT, -20, 151);
 
     lv_obj_t *close_btn = lv_button_create(settings_panel);
     lv_obj_set_size(close_btn, 94, 38);

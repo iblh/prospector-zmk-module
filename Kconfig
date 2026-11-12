@@ -41,6 +41,23 @@ config PROSPECTOR_SPLIT_SCAN_POLICY
       with a half online, and no scanning once all slots are occupied.
       Requires the pinned ZMK central source supported by the module generator.
 
+config PROSPECTOR_LEFT_SLOT_RECOVERY
+    bool "Explicit one-time old left slot recovery image"
+    depends on PROSPECTOR_SPLIT_SCAN_POLICY && PROSPECTOR_TOUCH_UI && SETTINGS && BT_SETTINGS
+    default n
+    help
+      Maintenance only: gate split startup, preserve slot 0 and its bond,
+      and remove slot 1's stored address and exact bond once. No global reset.
+
+config PROSPECTOR_LEFT_RECOVERY_GENERATION
+    int "Explicitly authorized left replacement generation"
+    depends on PROSPECTOR_LEFT_SLOT_RECOVERY
+    range 1 2
+    default 1
+    help
+      Separate one-time transaction for a subsequent controller replacement.
+      Generation 2 must only be flashed for the second authorized replacement.
+
 config PROSPECTOR_LEFT_PERIPHERAL_SLOT
     int "Bonded BLE slot displayed as the left half (two-peripheral Touch UI)"
     range 0 1

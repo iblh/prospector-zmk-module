@@ -9,6 +9,14 @@
 lv_obj_t *zmk_display_status_screen(void);
 int operator_widget_modifier_indicator_cb(const zmk_event_t *eh);
 static uint32_t ticks;
+static void report_heap(const char *stage) {
+    lv_mem_monitor_t memory;
+    lv_mem_monitor(&memory);
+    fprintf(stderr, "LVGL %s: pointers=%zu-bit pool=%zu used=%zu peak=%zu free=%zu largest=%zu\n",
+            stage, sizeof(void *) * 8, memory.total_size,
+            memory.total_size - memory.free_size, memory.max_used,
+            memory.free_size, memory.free_biggest_size);
+}
 void host_device_screen_tests(void);
 void host_peripheral_set(uint8_t slot, bool connected, uint8_t level);
 void host_peripheral_publish(void);
@@ -102,6 +110,15 @@ static const char *arg_value(int *index, int argc, char **argv) {
     return argv[*index];
 }
 
+static lv_obj_t *find_brightness_slider(lv_obj_t *obj) {
+    if (lv_obj_check_type(obj, &lv_slider_class)) { return obj; }
+    for (uint32_t i = 0; i < lv_obj_get_child_count(obj); i++) {
+        lv_obj_t *found = find_brightness_slider(lv_obj_get_child(obj, i));
+        if (found) { return found; }
+    }
+    return NULL;
+}
+
 int main(int argc, char **argv) {
     const char *output = "operator.raw";
     const char *mods = "shift";
@@ -185,7 +202,9 @@ int main(int argc, char **argv) {
     host_mode = input_mode;
 #endif
 #ifdef PROSPECTOR_HOST_ALL_LAYOUTS
-    if (peripheral_tests) { host_peripheral_screen_tests(); return 0; }
+    if (peripheral_tests) {
+        host_peripheral_screen_tests(); report_heap("peripheral-tests"); return 0;
+    }
 #endif
     lv_obj_t *screen = zmk_display_status_screen();
 #ifdef PROSPECTOR_HOST_ALL_LAYOUTS
@@ -208,7 +227,9 @@ int main(int argc, char **argv) {
     lv_obj_update_layout(screen);
 
     if (device_tests) {
+        report_heap("before device-tests");
         host_device_screen_tests();
+        report_heap("device-tests");
         return 0;
     }
     if (device_page) {
@@ -233,14 +254,18 @@ int main(int argc, char **argv) {
     fprintf(stderr, "LVGL operator heap used: %zu bytes\n",
             memory.total_size - memory.free_size);
 
+    lv_obj_t *snapshot_target = device_page ? lv_obj_get_child(lv_layer_top(), -1) : screen;
     if (touch_panel) {
-        lv_obj_t *panel = lv_obj_get_child(screen, -1);
+        lv_obj_t *slider = find_brightness_slider(lv_layer_top());
+        if (!slider) { return 1; }
+        lv_obj_t *panel = lv_obj_get_parent(slider);
         lv_obj_remove_flag(panel, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_update_layout(screen);
+        lv_obj_move_foreground(panel);
+        lv_obj_update_layout(lv_layer_top());
+        snapshot_target = panel;
     }
 
-    lv_draw_buf_t *snapshot = lv_snapshot_take(device_page ? lv_obj_get_child(lv_layer_top(), -1) : screen,
-                                               LV_COLOR_FORMAT_ARGB8888);
+    lv_draw_buf_t *snapshot = lv_snapshot_take(snapshot_target, LV_COLOR_FORMAT_ARGB8888);
     if (!snapshot) {
         fprintf(stderr, "Failed to capture LVGL snapshot\n");
         return 1;

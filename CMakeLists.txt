@@ -11,6 +11,7 @@ if(CONFIG_PROSPECTOR_HCI_TRACE)
   zephyr_link_libraries(-Wl,--wrap=hci_acl_handle -Wl,--wrap=hci_num_cmplt_encode)
 endif()
 zephyr_library_sources_ifdef(CONFIG_PROSPECTOR_SCAN_AB src/scan_ab.c)
+zephyr_library_sources_ifdef(CONFIG_PROSPECTOR_LEFT_SLOT_RECOVERY src/left_slot_recovery.c)
 
 if(CONFIG_PROSPECTOR_SPLIT_SCAN_POLICY)
   if(CONFIG_PROSPECTOR_SCAN_AB)

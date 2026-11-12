@@ -5,6 +5,9 @@ project(prospector_operator_renderer C)
 set(PROSPECTOR_ROOT "" CACHE PATH "Prospector module root")
 set(LVGL_DIR "" CACHE PATH "LVGL source directory")
 option(PROSPECTOR_HOST_INPUT_MODES "Render and test input-mode pages" OFF)
+option(PROSPECTOR_HOST_LEFT_RECOVERY "Show the maintenance status with harmless host mock" OFF)
+option(PROSPECTOR_HOST_STUDIO_USB "Exercise the USB editor lock UI with a host mock" OFF)
+set(PROSPECTOR_HOST_HEAP_BYTES "" CACHE STRING "Optional LVGL heap limit for non-snapshot tests")
 
 set(OPERATOR_LAYER_COUNT "5" CACHE STRING "Layer count")
 set(OPERATOR_PROFILE_COUNT "5" CACHE STRING "BLE profile count")
@@ -25,6 +28,9 @@ set(LV_CONF_BUILD_DISABLE_THORVG_INTERNAL ON CACHE BOOL "" FORCE)
 
 add_subdirectory(${LVGL_DIR} ${CMAKE_BINARY_DIR}/lvgl)
 target_include_directories(lvgl SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR})
+if(PROSPECTOR_HOST_HEAP_BYTES)
+  target_compile_definitions(lvgl PUBLIC LV_MEM_SIZE=${PROSPECTOR_HOST_HEAP_BYTES})
+endif()
 
 add_executable(operator_renderer
   src/main.c
@@ -75,6 +81,13 @@ target_include_directories(operator_renderer PRIVATE
 )
 
 target_link_libraries(operator_renderer PRIVATE lvgl::lvgl m)
+
+if(PROSPECTOR_HOST_LEFT_RECOVERY)
+  target_compile_definitions(operator_renderer PRIVATE CONFIG_PROSPECTOR_LEFT_SLOT_RECOVERY=1)
+endif()
+if(PROSPECTOR_HOST_STUDIO_USB)
+  target_compile_definitions(operator_renderer PRIVATE CONFIG_ZMK_STUDIO_RPC=1)
+endif()
 
 if(PROSPECTOR_HOST_INPUT_MODES)
   target_compile_definitions(operator_renderer PRIVATE CONFIG_PROSPECTOR_INPUT_MODES=1)

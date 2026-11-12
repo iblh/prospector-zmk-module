@@ -7,6 +7,18 @@ int host_flash_requests;
 int host_flash_request_error;
 int host_flash_async_error;
 const char *host_usb_state = "READY";
+bool host_studio_unlocked;
+int host_studio_toggles, host_studio_error;
+bool prospector_device_studio_unlocked(void) { return host_studio_unlocked; }
+int prospector_device_toggle_studio_lock(void) {
+    host_studio_toggles++;
+    if (!host_studio_error) { host_studio_unlocked = !host_studio_unlocked; }
+    return host_studio_error;
+}
+#ifdef CONFIG_PROSPECTOR_LEFT_SLOT_RECOVERY
+/* UI testing only: never link the destructive maintenance service on the host. */
+const char *prospector_left_recovery_status(void) { return "LEFT CLEARED"; }
+#endif
 
 void prospector_device_info_get(struct prospector_device_info *info) {
     *info = (struct prospector_device_info){

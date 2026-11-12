@@ -55,6 +55,17 @@ def generate(source, output):
     text = text.replace(init, '''BUILD_ASSERT(CONFIG_ZMK_BLE_INIT_PRIORITY == 50,
              "Scan policy init order requires the pinned BLE init priority 50");
 SYS_INIT(zmk_split_bt_central_init, APPLICATION, 51);''')
+    hook = 'static int finish_init() {\n'
+    if text.count(hook) != 1:
+        raise ValueError('Unsupported settings commit hook')
+    text = text.replace(hook, '''#if defined(CONFIG_PROSPECTOR_LEFT_SLOT_RECOVERY)
+#include <prospector/left_slot_recovery.h>
+#endif
+static int finish_init() {
+#if defined(CONFIG_PROSPECTOR_LEFT_SLOT_RECOVERY)
+    if (prospector_left_recovery_start(finish_init)) { return 0; }
+#endif
+''')
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(text)
     manifest = dict(zmk_base_sha='4dd95d7840eb3d5a3f59bb29fbf1ab054715ef85',
