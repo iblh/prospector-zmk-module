@@ -25,8 +25,8 @@ The right half remains at 800 CPI / ATT3 / 8ms with its existing diagnostic imag
 A v0.1.0-rc1 package freezes the existing binaries; it is not a claim of full stable
 release acceptance. Old-left recovery is opt-in maintenance only, never a normal
 boot action; the second authorized replacement uses a separate one-time record.
-See the [project guide](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/docs/11-input-modes-guide.md)
-and [current acceptance record](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/docs/06-roadmap-and-acceptance.md).
+See the [project guide](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/USER-GUIDE.md)
+and [current acceptance record](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/STATUS.md).
 
 ## Table of Contents
 
@@ -317,7 +317,7 @@ LVGL host also supports `PROSPECTOR_HOST_INPUT_MODES=ON` and
 
 The local build is a candidate: keyboard-half flashing, BLE pairing, HID shortcuts,
 GAME and trackball behavior require physical acceptance. Full workspace keymap,
-reproduction and pairing guide: [input-mode guide](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/docs/11-input-modes-guide.md).
+reproduction and pairing guide: [input-mode guide](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/USER-GUIDE.md).
 
 ### T5-02 peripheral status synchronization
 
@@ -359,4 +359,4 @@ Dongle build; it remains available for reproducible diagnostics.
 
 Native policy and startup tests: `tools/test_scan_policy.py` and
 `tools/test_scan_startup.py` (C compiler and sibling pinned ZMK checkout required).
-See the companion [current baseline and optimization backlog](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/docs/27-current-baseline-and-next-steps.md).
+See the companion [current baseline and optimization backlog](https://github.com/iblh/charybdis-wireless-mini-zmk-firmware/blob/feat/touch-no-sensor/docs/prospector-touch/STATUS.md).
