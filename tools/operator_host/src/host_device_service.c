@@ -48,7 +48,7 @@ int host_mode_requests, host_mode_error;
 int prospector_input_mode_get(void) { return host_mode; }
 int prospector_input_mode_pending(void) { return host_mode_pending; }
 const char *prospector_input_mode_name(int mode) {
-    static const char *names[] = {"MAC-DV", "WIN-DV", "GAME"};
+    static const char *names[] = {"MAC", "WIN", "GAME"};
     return mode >= 0 && mode < 3 ? names[mode] : "UNKNOWN";
 }
 int prospector_input_mode_request(int mode) {

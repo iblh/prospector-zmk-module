@@ -12,7 +12,7 @@ This is a [ZMK module](https://zmk.dev/docs/features/modules) that provides cust
 With `CONFIG_PROSPECTOR_TOUCH_UI=y`, runtime layouts are Classic / Field / Operator;
 Radii remains available only to upstream compile-time builds. Touch supplies manual
 10–100% brightness, swipe navigation, a device page and confirmed UF2 entry.
-Optional MAC-DV / WIN-DV / GAME input modes require the companion dedicated keymap.
+Optional MAC / WIN / GAME input modes require the companion dedicated keymap.
 
 Touch mapping, PWM, idle/touch wake and T4-01 device/UF2 UI have user acceptance.
 As of 2026-11-12, the user reports the T5-12 USB control-page image boots and
@@ -178,7 +178,7 @@ Swipe up on a status screen to open the shared DEVICE page. It shows firmware
 release, build time (America/Los_Angeles), working-source content fingerprint,
 current built keymap label, USB readiness and BLE slot K1/K2 connectivity. Slot
 numbers do not imply verified physical left/right identity. The current keymap is
-QWERTY; the planned MAC-DV/WIN-DV/GAME selector is not implemented yet.
+QWERTY; the planned MAC/WIN/GAME selector is not implemented yet.
 
 FLASH opens confirmation; a separate continuous two-second hold requests UF2 mode.
 Early release, slide-out, CANCEL, timeout and idle cancel it. The reboot worker uses
@@ -297,20 +297,24 @@ CONFIG_LV_Z_VDB_SIZE=25
 - Caps lock indication
 
 
-### Prospector Touch input modes (local T5-01 candidate)
+### Prospector Touch input modes
 
 `CONFIG_PROSPECTOR_INPUT_MODES` requires the dedicated firmware-side
-`touch_modes.keymap`: complete MAC-DV / WIN-DV / GAME bases (IDs 0/1/2), temporary
-NUM/NAV/SYM/FN/SLOW/SCROLL layers (IDs 3–8). Swipe up → DEVICE → MODE selects the
+`touch_modes.keymap`: complete MAC / WIN / GAME bases (IDs 0/1/2), temporary
+LUOSHU/SYM/FN/SLOW/SCROLL layers (IDs 3–7). Swipe up → DEVICE → MODE selects the
 input mode independently of Classic/Field/Operator appearance. The mode worker
 waits for all received physical positions to release, 350ms quiet and neutral HID
 reports. A GNU ld position-event wrapper observes fresh events before hold-tap
 capture, with no upstream ZMK source edits. Do not remove it or replace it with a
-late event subscription. The dedicated keymap's longest hold-tap is 280ms.
+late event subscription. MAC/WIN keep home-row mods with bilateral position
+restrictions, a 280ms tapping term, 175ms quick-tap and 250ms prior-idle tap window.
+FN keeps a MAC shortcut only; WIN/GAME are chosen from the touch device page. The
+far-right thumb enters SCROLL while FN is held.
 
-Typing uses native mod-morph with keep-mods, while GAME letters and primary thumbs
-are direct. Mode labels and CMD/OPT versus WIN/ALT update at runtime. Default mode
-is MAC-DV; no new settings persistence or BLE host switching is added. Tests live
+MAC and WIN always emit Dvorak letter positions, including while Command/Ctrl is
+held; GAME letters remain direct QWERTY. FN provides media controls. Visible mode
+labels and CMD/OPT versus WIN/ALT update at runtime.
+Default mode is MAC; no new settings persistence or BLE host switching is added. Tests live
 in `tools/test_input_modes.py` and `tools/test_device_service.py`. The real-source
 LVGL host also supports `PROSPECTOR_HOST_INPUT_MODES=ON` and
 `PROSPECTOR_HOST_ALL_LAYOUTS=ON` for mode/confirmation input tests and previews.

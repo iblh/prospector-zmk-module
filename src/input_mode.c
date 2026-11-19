@@ -13,7 +13,7 @@
  * Observe BEFORE hold-tap captures events. Replayed events bypass this wrapper.
  * A normal subscription after keymap would never see handled/captured events.
  * GNU ld --wrap keeps the upstream ZMK checkout unchanged. */
-#define QUIET_MS 350 /* longer than the longest (280ms) hold-tap in this keymap */
+#define QUIET_MS 350 /* allow held thumb layer taps and HID state to settle before switching */
 static atomic_t current_mode;
 static atomic_t requested_mode = ATOMIC_INIT(-1);
 static uint64_t pressed_positions;
@@ -22,7 +22,7 @@ static int64_t last_position_time;
 int prospector_input_mode_get(void) { return atomic_get(&current_mode); }
 int prospector_input_mode_pending(void) { return atomic_get(&requested_mode); }
 const char *prospector_input_mode_name(int mode) {
-    static const char *const names[] = {"MAC-DV", "WIN-DV", "GAME"};
+    static const char *const names[] = {"MAC", "WIN", "GAME"};
     return mode >= 0 && mode < 3 ? names[mode] : "UNKNOWN";
 }
 
@@ -80,10 +80,10 @@ int __wrap_raise_zmk_position_state_changed(struct zmk_position_state_changed ev
 }
 
 void prospector_input_mode_format_layer(uint8_t layer, char *buffer, size_t size) {
-    static const char *const temporary[] = {"NUM", "NAV", "SYM", "FN", "SLOW", "SCRL"};
+    static const char *const temporary[] = {"LUO", "SYM", "FN", "SLOW", "SCRL"};
     if (layer < 3) {
         snprintf(buffer, size, "%s", prospector_input_mode_name(layer));
-    } else if (layer < 9) {
+    } else if (layer < 8) {
         static const char prefix[] = {'M', 'W', 'G'};
         snprintf(buffer, size, "%c/%s", prefix[prospector_input_mode_get()], temporary[layer - 3]);
     } else { snprintf(buffer, size, "%u", layer); }

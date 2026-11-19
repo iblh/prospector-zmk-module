@@ -170,12 +170,12 @@ void host_device_screen_tests(void) {
     open_info();
     tap(130, 110);
     assert(visible_text(lv_layer_top(), "INPUT MODE"));
-    assert(visible_text(lv_layer_top(), "ACTIVE: MAC-DV"));
-    tap(135, 92); // WIN-DV
+    assert(visible_text(lv_layer_top(), "ACTIVE: MAC"));
+    tap(135, 92); // WIN
     assert(host_mode_requests == 1 && host_mode_pending == 1 && host_mode == 0);
-    assert(visible_text(lv_layer_top(), "WAIT: WIN-DV\nRELEASE ALL KEYS"));
+    assert(visible_text(lv_layer_top(), "WAIT: WIN\nRELEASE ALL KEYS"));
     host_mode = 1; host_mode_pending = -1; host_advance_time(40);
-    assert(visible_text(lv_layer_top(), "ACTIVE: WIN-DV"));
+    assert(visible_text(lv_layer_top(), "ACTIVE: WIN"));
     tap(135, 132); // GAME
     assert(host_mode_requests == 2 && host_mode_pending == 2);
     host_mode = 2; host_mode_pending = -1; host_advance_time(40);

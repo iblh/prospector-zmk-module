@@ -62,7 +62,7 @@ static enum zmk_studio_core_lock_state studio_state;
 enum zmk_studio_core_lock_state zmk_studio_core_get_lock_state(void) {return studio_state;}
 void zmk_studio_core_lock(void) {studio_state=ZMK_STUDIO_CORE_LOCK_STATE_LOCKED;}
 void zmk_studio_core_unlock(void) {studio_state=ZMK_STUDIO_CORE_LOCK_STATE_UNLOCKED;}
-static const char *mode_names[] = {"MAC-DV", "WIN-DV", "GAME"};
+static const char *mode_names[] = {"MAC", "WIN", "GAME"};
 int prospector_input_mode_get(void) { return test_mode; }
 const char *prospector_input_mode_name(int mode) { return mode_names[mode]; }
 static struct k_work_delayable *pending;

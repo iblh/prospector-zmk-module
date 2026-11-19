@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise production mode worker, native ZMK mod-morph, shortcuts and keymap contracts.
+"""Exercise the production mode worker, direct Dvorak bindings, shortcuts and keymap contracts.
 No hardware is mocked as passing. Requires local firmware/zmk sources and a C compiler.
 """
 from pathlib import Path
@@ -12,38 +12,41 @@ workspace = root.parent
 keymap = (workspace / 'firmware/config/keymaps/touch_modes.keymap').read_text()
 q = 'ESC Q W E R T Y U I O P BSPC TAB A S D F G H J K L SEMI ENTER LSHFT Z X C V B N M COMMA DOT FSLH RSHFT'.split()
 d = 'ESC SQT COMMA DOT P Y F G C R L BSPC TAB A O E U I D H T N S ENTER LSHFT SEMI Q J K X B M W V Z RSHFT'.split()
-# Check complete layout matrix and shortcut masks, including punctuation.
-for mode in ('mac', 'win'):
-    for i in range(36):
-        if q[i] == d[i]: continue
-        node = re.search(rf'{mode}_{i}:.*?\{{(.*?)\}};', keymap, re.S).group(1)
-        assert f'bindings = <&kp {d[i]}>, <&kp {q[i]}>;' in node
-        masks = re.findall(r'(?:mods|keep-mods) = <(.*?)>;', node)
-        assert len(masks) == 2 and masks[0] == masks[1]
-        assert 'MOD_RCTL' in masks[0] and 'MOD_LCTL' in masks[0]
-        assert ('MOD_RGUI' in masks[0]) == (mode == 'mac')
+# MAC and WIN always send Dvorak keycodes, including when a modifier is held.
 layer_names = re.findall(r'display-name = "(.*?)";\s*bindings = <', keymap[keymap.index('keymap {'):])
-assert layer_names == ['MAC-DV','WIN-DV','GAME','NUM','NAV','SYM','FN','SLOW','SCROLL']
-for label,n in [('MAC',0),('WIN',1),('GAME',2),('NUM',3),('NAV',4),('SYM',5),('FN',6),('SLOW',7),('SCROLL',8)]:
+assert layer_names == ['MAC','WIN','GAME','LUOSHU','SYM','FN','SLOW','SCROLL']
+for label,n in [('MAC',0),('WIN',1),('GAME',2),('LUOSHU',3),('SYM',4),('FN',5),('SLOW',6),('SCROLL',7)]:
     assert f'#define {label} {n}' in keymap
-for name in ('MAC-DV', 'WIN-DV', 'GAME', 'NUM', 'NAV', 'SYM', 'FN', 'SLOW', 'SCROLL'):
-    bindings = re.search(rf'display-name = "{name}"; bindings = <(.*?)>;', keymap, re.S).group(1)
+assert 'behavior-mod-morph' not in keymap
+assert 'mac_position_' not in keymap and 'win_position_' not in keymap
+hrm_mods = {13:('LGUI','LCTRL'),14:('LALT','LALT'),15:('LSHFT','LSHFT'),16:('LCTRL','LGUI'),19:('RCTRL','RGUI'),20:('RSHFT','RSHFT'),21:('RALT','RALT'),22:('RGUI','RCTRL')}
+for name in ('MAC', 'WIN', 'GAME', 'LUOSHU', 'SYM', 'FN', 'SLOW', 'SCROLL'):
+    bindings = re.search(rf'display-name = "{re.escape(name)}"; bindings = <(.*?)>;', keymap, re.S).group(1)
     assert bindings.count('&') == 41, name
     if name == 'GAME':
         assert re.findall(r'&kp (\w+)', bindings)[:36] == q
         assert not any(tag in bindings for tag in ('hrm', 'thumb', '&lt', '&mt', '&td'))
-assert max(map(int,re.findall(r'tapping-term-ms = <(\d+)>',keymap))) < 350
-hrm_mods = {13:('LGUI','LCTRL'),14:('LALT','LALT'),15:('LSHFT','LSHFT'),16:('LCTRL','LGUI'),19:('RCTRL','RGUI'),20:('RSHFT','RSHFT'),21:('RALT','RALT'),22:('RGUI','RCTRL')}
-for n,mode in enumerate(('mac','win')):
-    text=re.search(r'display-name = "'+('MAC-DV' if n==0 else 'WIN-DV')+r'"; bindings = <(.*?)>;',keymap,re.S).group(1)
-    entries=[' '.join(e.split()) for e in re.findall(r'&[^&]+',text)]
+assert len(re.findall(r'tapping-term-ms = <280>', keymap)) == 16
+assert len(re.findall(r'require-prior-idle-ms = <250>', keymap)) == 16
+for mode, layer in (('mac','MAC'),('win','WIN')):
+    text = re.search(rf'display-name = "{layer}"; bindings = <(.*?)>;', keymap, re.S).group(1)
+    entries = [' '.join(e.split()) for e in re.findall(r'&[^&]+', text)]
     for i in range(36):
         if i in hrm_mods:
-            assert entries[i] == f'&{mode}_hrm_{i} {hrm_mods[i][n]} '+(d[i] if d[i]==q[i] else '0')
-            node=re.search(rf'{mode}_hrm_{i}:.*?\{{(.*?)\}};',keymap,re.S).group(1)
-            assert ('bindings = <&kp>, <'+('&kp' if d[i]==q[i] else f'&{mode}_{i}')+'>;') in node
+            assert entries[i] == f'&{mode}_hrm_{i} {hrm_mods[i][0 if mode == "mac" else 1]} {d[i]}'
+            node = re.search(rf'{mode}_hrm_{i}:.*?\{{(.*?)\}};',keymap,re.S).group(1)
+            assert 'hold-trigger-key-positions' in node and 'hold-trigger-on-release' in node
         else:
-            assert entries[i] == ('&kp '+d[i] if d[i]==q[i] else f'&{mode}_{i}')
+            assert entries[i] == f'&kp {d[i]}'
+fn = re.search(r'display-name = "FN"; bindings = <(.*?)>;', keymap, re.S).group(1)
+fn_entries = [' '.join(e.split()) for e in re.findall(r'&[^&]+', fn)]
+luoshu = re.search(r'display-name = "LUOSHU"; bindings = <(.*?)>;', keymap, re.S).group(1)
+nav_entries = [' '.join(e.split()) for e in re.findall(r'&[^&]+', luoshu)]
+assert nav_entries[3] == '&kp UP' and nav_entries[14] == '&kp LEFT' and nav_entries[15] == '&kp DOWN'
+assert nav_entries[13] == '&edit 0' and nav_entries[14] == '&kp LEFT'
+assert nav_entries[15] == '&kp DOWN' and nav_entries[16] == '&kp RIGHT'
+assert '&mode WIN' not in fn and '&mode GAME' not in fn
+assert fn_entries[40] == '&mo SCROLL'
 assert '&scroller { layers = <SCROLL>; };' in keymap
 assert '&slow_pointer { layers = <SLOW>; };' in keymap
 assert 'combos.dtsi' not in keymap and 'macros.dtsi' not in keymap
@@ -147,45 +150,12 @@ int main(void) {
     tick(350);assert(layer==2 && switches==3); // newest request wins
     schedule_error=-ENOMEM;assert(prospector_input_mode_request(0)==-ENOMEM);
     assert(prospector_input_mode_pending()==-1);schedule_error=0;
-    char label[16];prospector_input_mode_format_layer(6,label,sizeof(label));assert(!strcmp(label,"G/FN"));
-    prospector_input_mode_format_layer(1,label,sizeof(label));assert(!strcmp(label,"WIN-DV"));
+    char label[16];prospector_input_mode_format_layer(5,label,sizeof(label));assert(!strcmp(label,"G/FN"));
+    prospector_input_mode_format_layer(3,label,sizeof(label));assert(!strcmp(label,"G/LUO"));
+    prospector_input_mode_format_layer(1,label,sizeof(label));assert(!strcmp(label,"WIN"));
     puts("PASS mode worker: raw held keys incl unresolved hold-tap, quiet interval, all HID reports, cancel/replace, errors, labels");
 }
 '''
-morph_test = r'''
-static uint8_t mods;
-static uint32_t emitted;
-static bool emitted_down;
-static struct behavior_mod_morph_data data;
-static struct behavior_mod_morph_config cfg;
-static struct device morph = {.config=&cfg,.data=&data};
-const struct device *zmk_behavior_get_binding(const char *s) {(void)s;return &morph;}
-zmk_mod_flags_t zmk_hid_get_explicit_mods(void) {return mods;}
-int zmk_hid_masked_modifiers_set(zmk_mod_flags_t n) {assert(n==0);return 0;}
-int zmk_hid_masked_modifiers_clear(void) {return 0;}
-int zmk_behavior_invoke_binding(struct zmk_behavior_binding *b,struct zmk_behavior_binding_event e,bool down) {
-    (void)e;emitted=b->param1;emitted_down=down;return 0;
-}
-static const uint32_t normal[] = {NORMAL_KEYS};
-static const uint32_t qwerty[] = {QWERTY_KEYS};
-int main(void) {
-    struct zmk_behavior_binding b={.behavior_dev="morph"};struct zmk_behavior_binding_event e={0};
-    for (int mac=0;mac<=1;mac++) for(size_t i=0;i<ARRAY_SIZE(normal);i++) {
-        cfg.normal_binding.param1=normal[i];cfg.morph_binding.param1=qwerty[i];
-        cfg.mods=mac ? (MOD_LGUI|MOD_RGUI|MOD_LCTL|MOD_RCTL) : (MOD_LCTL|MOD_RCTL);
-        cfg.masked_mods=0; // generated DT mods & ~keep-mods
-        for(int early=0;early<2;early++) for(int combo=0;combo<256;combo++) {
-            mods=combo;uint32_t expected=mods&cfg.mods?qwerty[i]:normal[i];
-            assert(on_mod_morph_binding_pressed(&b,e)==0 && emitted_down && emitted==expected);
-            assert(on_mod_morph_binding_pressed(&b,e)==-ENOTSUP); // duplicate press cannot overwrite branch
-            if(early)mods=0; // release modifier first: must still release the key chosen at key-down
-            assert(on_mod_morph_binding_released(&b,e)==0 && !emitted_down && emitted==expected);
-            assert(on_mod_morph_binding_released(&b,e)==-ENOTSUP);
-        }
-    }
-    puts("PASS native ZMK mod-morph: all 36 physical positions x 256 modifier masks x both OS profiles x both release orders");
-}
-'''.replace('NORMAL_KEYS', ','.join(d)).replace('QWERTY_KEYS', ','.join(q))
 shortcut_test = r'''
 static int mode;
 static uint32_t emitted;
@@ -215,9 +185,8 @@ with tempfile.TemporaryDirectory() as tmp:
     for name in headers:
         h=path/name;h.parent.mkdir(parents=True,exist_ok=True);h.write_text('#include "platform.h"\n')
     for name,source,test in [('worker',root/'src/input_mode.c',worker_test),
-        ('morph',workspace/'firmware/zmk/app/src/behaviors/behavior_mod_morph.c',morph_test),
         ('shortcut',root/'src/behaviors/behavior_shortcut.c',shortcut_test)]:
         (path/'test.c').write_text(f'#include <errno.h>\n#include <dt-bindings/zmk/keys.h>\n#include "{source}"\n'+test)
         subprocess.run(['cc','-std=c11','-I',str(path),'-I',str(root/'include'),'-I',str(workspace/'firmware/zmk/app/include'),str(path/'test.c'),'-o',str(path/'test')],check=True)
         subprocess.run([str(path/'test')],check=True)
-print('PASS keymap contracts: nine complete 41-key layers, full Dvorak/QWERTY maps, keep-mods, GAME direct bindings, pointing layer IDs')
+print('PASS keymap contracts: eight complete 41-key layers, direct Dvorak MAC/WIN bindings, GAME QWERTY bindings, pointing layer IDs')

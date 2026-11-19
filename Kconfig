@@ -68,7 +68,7 @@ config PROSPECTOR_LEFT_PERIPHERAL_SLOT
       display order only. It never changes key positions or BLE bonding data.
 
 config PROSPECTOR_INPUT_MODES
-    bool "MAC-DV, WIN-DV and GAME input modes"
+    bool "MAC, WIN and GAME input modes"
     depends on PROSPECTOR_TOUCH_UI && ZMK_SPLIT_ROLE_CENTRAL && ZMK_POINTING
     default n
     help

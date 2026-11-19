@@ -4,8 +4,8 @@
 #include <prospector/input_mode.h>
 #if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
 static const struct behavior_parameter_value_metadata modes[] = {
-    {.display_name = "MAC-DV", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = 0},
-    {.display_name = "WIN-DV", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = 1},
+    {.display_name = "MAC", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = 0},
+    {.display_name = "WIN", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = 1},
     {.display_name = "GAME", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = 2},
 };
 static const struct behavior_parameter_metadata_set mode_set = {
